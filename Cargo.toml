@@ -2,7 +2,15 @@
 name = "luma"
 version = "0.1.0"
 edition = "2024"
-description = "A small, clean programming language"
+description = "A small, kind programming language"
+
+[lib]
+name = "luma"
+path = "src/lib.rs"
+
+[[bin]]
+name = "luma"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -11,10 +19,6 @@ clap = { version = "4.5.60", features = ["derive"] }
 colored = "3.1.1"
 rand = "0.10.0"
 thiserror = "2.0.18"
-
-[[bin]]
-name = "luma"
-path = "src/main.rs"
 
 [profile.release]
 opt-level = "z"

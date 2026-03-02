@@ -234,7 +234,7 @@ impl Lexer {
             _ => {
                 if ch.is_alphabetic() || ch == '_' {
                     let literal = self.read_identifier();
-                    if let Some(keyword) = crate::syntax::Keyword::from_str(&literal) {
+                    if let Ok(keyword) = literal.parse::<crate::syntax::Keyword>() {
                         TokenKind::from(keyword)
                     } else {
                         TokenKind::Identifier(literal)

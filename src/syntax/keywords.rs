@@ -1,4 +1,5 @@
 // src/syntax/keywords.rs
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
@@ -8,41 +9,40 @@ pub enum Keyword {
     String,
     Bool,
     Void,
-
     // Statements
     If,
     Else,
     While,
     Print,
     Match,
-
     // Functions
     Return,
     Read,
-
     // Literals
     True,
     False,
 }
 
-impl Keyword {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for Keyword {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "int" => Some(Keyword::Int),
-            "float" => Some(Keyword::Float),
-            "string" => Some(Keyword::String),
-            "bool" => Some(Keyword::Bool),
-            "void" => Some(Keyword::Void),
-            "if" => Some(Keyword::If),
-            "else" => Some(Keyword::Else),
-            "while" => Some(Keyword::While),
-            "print" => Some(Keyword::Print),
-            "match" => Some(Keyword::Match),
-            "return" => Some(Keyword::Return),
-            "read" => Some(Keyword::Read),
-            "true" => Some(Keyword::True),
-            "false" => Some(Keyword::False),
-            _ => None,
+            "int" => Ok(Keyword::Int),
+            "float" => Ok(Keyword::Float),
+            "string" => Ok(Keyword::String),
+            "bool" => Ok(Keyword::Bool),
+            "void" => Ok(Keyword::Void),
+            "if" => Ok(Keyword::If),
+            "else" => Ok(Keyword::Else),
+            "while" => Ok(Keyword::While),
+            "print" => Ok(Keyword::Print),
+            "match" => Ok(Keyword::Match),
+            "return" => Ok(Keyword::Return),
+            "read" => Ok(Keyword::Read),
+            "true" => Ok(Keyword::True),
+            "false" => Ok(Keyword::False),
+            _ => Err(()),
         }
     }
 }
