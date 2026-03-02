@@ -15,3 +15,10 @@ thiserror = "2.0.18"
 [[bin]]
 name = "luma"
 path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
