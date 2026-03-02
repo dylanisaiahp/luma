@@ -1,1 +1,7 @@
 /target
+# Zed
+.zed/
+
+# OS
+.DS_Store
+Thumbs.db
