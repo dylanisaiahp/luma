@@ -12,7 +12,7 @@ impl Interpreter {
         _column: usize,
     ) -> Result<Value, RuntimeError> {
         let val = self.evaluate_expression(value)?;
-        self.variables.insert(name.to_string(), val.clone());
+        self.set_variable(name, val.clone());
         Ok(val)
     }
 
@@ -24,7 +24,7 @@ impl Interpreter {
         line: usize,
         column: usize,
     ) -> Result<Value, RuntimeError> {
-        let current = match self.variables.get(name) {
+        let current = match self.get_variable(name) {
             Some(val) => val.clone(),
             None => {
                 return Err(RuntimeError {
@@ -38,7 +38,6 @@ impl Interpreter {
         let right_val = self.evaluate_expression(value)?;
 
         let result = match (current, right_val, op) {
-            // Integer operations
             (Value::Integer(l), Value::Integer(r), AssignOpKind::Add) => Value::Integer(l + r),
             (Value::Integer(l), Value::Integer(r), AssignOpKind::Subtract) => Value::Integer(l - r),
             (Value::Integer(l), Value::Integer(r), AssignOpKind::Multiply) => Value::Integer(l * r),
@@ -52,8 +51,6 @@ impl Interpreter {
                 }
                 Value::Integer(l / r)
             }
-
-            // Float operations
             (Value::Float(l), Value::Float(r), AssignOpKind::Add) => Value::Float(l + r),
             (Value::Float(l), Value::Float(r), AssignOpKind::Subtract) => Value::Float(l - r),
             (Value::Float(l), Value::Float(r), AssignOpKind::Multiply) => Value::Float(l * r),
@@ -67,8 +64,6 @@ impl Interpreter {
                 }
                 Value::Float(l / r)
             }
-
-            // Mixed integer/float
             (Value::Integer(l), Value::Float(r), AssignOpKind::Add) => Value::Float(l as f64 + r),
             (Value::Float(l), Value::Integer(r), AssignOpKind::Add) => Value::Float(l + r as f64),
             (Value::Integer(l), Value::Float(r), AssignOpKind::Subtract) => {
@@ -103,8 +98,6 @@ impl Interpreter {
                 }
                 Value::Float(l / r as f64)
             }
-
-            // String concatenation
             (Value::String(l), Value::String(r), AssignOpKind::Add) => Value::String(l + &r),
             (Value::String(l), Value::Integer(r), AssignOpKind::Add) => {
                 Value::String(l + &r.to_string())
@@ -112,7 +105,6 @@ impl Interpreter {
             (Value::String(l), Value::Float(r), AssignOpKind::Add) => {
                 Value::String(l + &r.to_string())
             }
-
             _ => {
                 return Err(RuntimeError {
                     message: "Type mismatch in compound assignment".to_string(),
@@ -122,7 +114,7 @@ impl Interpreter {
             }
         };
 
-        self.variables.insert(name.to_string(), result.clone());
+        self.set_variable(name, result.clone());
         Ok(result)
     }
 }

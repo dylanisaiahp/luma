@@ -14,9 +14,11 @@ impl Interpreter {
             let cond_val = self.evaluate_expression(condition)?;
             match cond_val {
                 Value::Boolean(true) => {
+                    self.push_scope();
                     for stmt in body {
                         self.execute_statement(stmt)?;
                     }
+                    self.pop_scope();
                 }
                 Value::Boolean(false) => break,
                 _ => {
@@ -40,15 +42,19 @@ impl Interpreter {
         let cond_val = self.evaluate_expression(condition)?;
         match cond_val {
             Value::Boolean(true) => {
+                self.push_scope();
                 for stmt in then_branch {
                     self.execute_statement(stmt)?;
                 }
+                self.pop_scope();
             }
             Value::Boolean(false) => {
                 if let Some(else_branch) = else_branch {
+                    self.push_scope();
                     for stmt in else_branch {
                         self.execute_statement(stmt)?;
                     }
+                    self.pop_scope();
                 }
             }
             _ => {
@@ -82,9 +88,11 @@ impl Interpreter {
                     if let Value::Integer(m) = &match_val
                         && m == n
                     {
+                        self.push_scope();
                         for stmt in &arm.body {
                             self.execute_statement(stmt)?;
                         }
+                        self.pop_scope();
                         matched = true;
                         break;
                     }
@@ -102,17 +110,21 @@ impl Interpreter {
                             m >= start && m <= end
                         }
                     {
+                        self.push_scope();
                         for stmt in &arm.body {
                             self.execute_statement(stmt)?;
                         }
+                        self.pop_scope();
                         matched = true;
                         break;
                     }
                 }
                 MatchPattern::Wildcard => {
+                    self.push_scope();
                     for stmt in &arm.body {
                         self.execute_statement(stmt)?;
                     }
+                    self.pop_scope();
                     matched = true;
                     break;
                 }
@@ -125,9 +137,11 @@ impl Interpreter {
         }
 
         if !matched && let Some(else_body) = else_arm {
+            self.push_scope();
             for stmt in else_body {
                 self.execute_statement(stmt)?;
             }
+            self.pop_scope();
         }
 
         Ok(Value::Void)

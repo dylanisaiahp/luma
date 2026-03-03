@@ -123,7 +123,7 @@ fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
 
     // Exit once, at the very end
     if collector.has_errors() {
-        anyhow::bail!("Compilation failed");
+        std::process::exit(1);
     }
 
     if show_time {

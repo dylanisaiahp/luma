@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Default)]
 pub struct Interpreter {
-    pub variables: HashMap<String, Value>,
+    pub scopes: Vec<HashMap<String, Value>>,
     pub var_info: HashMap<String, VarInfo>,
     pub used_variables: HashSet<String>,
     pub warnings: Vec<Diagnostic>,
@@ -17,10 +17,48 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            variables: HashMap::new(),
+            scopes: vec![HashMap::new()],
             var_info: HashMap::new(),
             used_variables: HashSet::new(),
             warnings: Vec::new(),
+        }
+    }
+
+    pub fn push_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    pub fn get_variable(&self, name: &str) -> Option<&Value> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(val) = scope.get(name) {
+                return Some(val);
+            }
+        }
+        None
+    }
+
+    pub fn set_variable(&mut self, name: &str, value: Value) {
+        // Walk scopes to find existing binding, update in place
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.contains_key(name) {
+                scope.insert(name.to_string(), value);
+                return;
+            }
+        }
+        // Not found — insert in current scope
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.to_string(), value);
+        }
+    }
+
+    pub fn declare_variable(&mut self, name: &str, value: Value) {
+        // Always declare in the current (innermost) scope
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.to_string(), value);
         }
     }
 
@@ -79,9 +117,11 @@ impl Interpreter {
             }
             Stmt::Function { name, body } => {
                 if name == "main" {
+                    self.push_scope();
                     for stmt in body {
                         self.execute_statement(stmt)?;
                     }
+                    self.pop_scope();
                 }
                 Ok(Value::Void)
             }

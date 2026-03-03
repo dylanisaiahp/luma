@@ -53,7 +53,7 @@ impl Interpreter {
             },
         );
 
-        self.variables.insert(name.to_string(), val);
+        self.declare_variable(name, val);
         Ok(Value::Void)
     }
 }

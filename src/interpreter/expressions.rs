@@ -19,7 +19,7 @@ impl Interpreter {
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
             ExprKind::Identifier(name) => {
                 self.used_variables.insert(name.clone());
-                match self.variables.get(name) {
+                match self.get_variable(name) {
                     Some(val) => Ok(val.clone()),
                     None => Err(RuntimeError {
                         message: format!("Undefined variable: {}", name),
@@ -30,7 +30,7 @@ impl Interpreter {
             }
             ExprKind::Interpolation(ident) => {
                 self.used_variables.insert(ident.clone());
-                match self.variables.get(ident) {
+                match self.get_variable(ident) {
                     Some(val) => Ok(Value::String(match val {
                         Value::Integer(n) => n.to_string(),
                         Value::Float(f) => f.to_string(),

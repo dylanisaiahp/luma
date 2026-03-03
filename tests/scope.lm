@@ -1,0 +1,8 @@
+void main() {
+    int x = 10;
+    if x > 5 {
+        int y = 99;
+        print(y);
+    }
+    print(y);
+}
