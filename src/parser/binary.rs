@@ -20,10 +20,14 @@ impl Parser {
                 TokenKind::LessEqual => crate::syntax::BinaryOp::LessEqual,
                 TokenKind::EqualEqual => crate::syntax::BinaryOp::Equal,
                 TokenKind::BangEqual => crate::syntax::BinaryOp::NotEqual,
+                TokenKind::And => crate::syntax::BinaryOp::And,
+                TokenKind::Or => crate::syntax::BinaryOp::Or,
                 _ => break,
             };
 
             let precedence = match op {
+                crate::syntax::BinaryOp::Or => 5,
+                crate::syntax::BinaryOp::And => 6,
                 crate::syntax::BinaryOp::Equal | crate::syntax::BinaryOp::NotEqual => 10,
                 crate::syntax::BinaryOp::Greater
                 | crate::syntax::BinaryOp::Less

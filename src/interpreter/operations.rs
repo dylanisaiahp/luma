@@ -135,6 +135,10 @@ pub fn evaluate_binary_op(
         (Value::String(l), Value::String(r), BinaryOp::Equal) => Ok(Value::Boolean(l == r)),
         (Value::String(l), Value::String(r), BinaryOp::NotEqual) => Ok(Value::Boolean(l != r)),
 
+        // Logical operators
+        (Value::Boolean(l), Value::Boolean(r), BinaryOp::And) => Ok(Value::Boolean(l && r)),
+        (Value::Boolean(l), Value::Boolean(r), BinaryOp::Or) => Ok(Value::Boolean(l || r)),
+
         _ => Err(RuntimeError {
             message: "Type mismatch in binary operation".to_string(),
             line,

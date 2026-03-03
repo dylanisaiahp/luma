@@ -84,6 +84,27 @@ impl Lexer {
                     Ok(TokenKind::Illegal("Unexpected character '!'".to_string()))
                 }
             }
+            '&' => {
+                self.read_char();
+                if self.ch == '&' {
+                    self.read_char();
+                    Ok(TokenKind::And)
+                } else if self.ch == '{' {
+                    let ident = self.read_interpolation()?;
+                    Ok(TokenKind::Interpolation(ident))
+                } else {
+                    Err(LexerError::UnexpectedCharacter(self.ch, line, col))
+                }
+            }
+            '|' => {
+                self.read_char();
+                if self.ch == '|' {
+                    self.read_char();
+                    Ok(TokenKind::Or)
+                } else {
+                    Err(LexerError::UnexpectedCharacter('|', line, col))
+                }
+            }
             '_' => {
                 self.read_char();
                 Ok(TokenKind::Underscore)
@@ -124,15 +145,6 @@ impl Lexer {
             ':' => {
                 self.read_char();
                 Ok(TokenKind::Colon)
-            }
-            '&' => {
-                self.read_char();
-                if self.ch == '{' {
-                    let ident = self.read_interpolation()?;
-                    Ok(TokenKind::Interpolation(ident))
-                } else {
-                    Err(LexerError::UnexpectedCharacter(self.ch, line, col))
-                }
             }
             _ => {
                 self.read_char();

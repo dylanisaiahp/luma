@@ -50,6 +50,10 @@ pub enum TokenKind {
     EqualEqual,
     BangEqual,
 
+    // Logical operators
+    And,
+    Or,
+
     // Assignment operators
     Equals,
     PlusEquals,
@@ -109,6 +113,8 @@ impl fmt::Display for TokenKind {
             TokenKind::LessEqual => write!(f, "<="),
             TokenKind::EqualEqual => write!(f, "=="),
             TokenKind::BangEqual => write!(f, "!="),
+            TokenKind::And => write!(f, "&&"),
+            TokenKind::Or => write!(f, "||"),
             TokenKind::Equals => write!(f, "="),
             TokenKind::PlusEquals => write!(f, "+="),
             TokenKind::MinusEquals => write!(f, "-="),
