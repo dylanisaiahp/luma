@@ -21,8 +21,8 @@ rand = "0.10.0"
 thiserror = "2.0.18"
 
 [profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
+opt-level = 3          # optimize for speed (Rust default)
+lto = "thin"           # faster than full LTO, still good
+strip = true           # keep binary size down
+# codegen-units = 1    # probably not needed yet
+# panic = "abort"      # maybe later if you really need tiny
