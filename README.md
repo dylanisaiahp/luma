@@ -17,7 +17,6 @@ Luma was built for people who want to focus on *what* they're building, not figh
 ---
 
 ## What It Looks Like
-
 ```luma
 void main() {
     int x = 5;
@@ -29,7 +28,7 @@ void main() {
 
     while x > 0 {
         print("&{x} remaining");
-        x = x - 1;
+        x -= 1;
     }
 
     print("Hello, &{name}!");
@@ -43,19 +42,20 @@ void main() {
 - **Explicit types** — `int x = 5;`, `string name = "Luma";`, `bool done = false;`
 - **No sigils** — just clear, readable keywords
 - **String interpolation** — `"Hello, &{name}!"` just works
+- **Logical operators** — `&&` and `||`
 - **Match statements** with integer and range patterns
 - **Compound assignments** — `+=`, `-=`, `*=`, `/=`
+- **Proper block scoping** — variables don't leak outside their block
 - **Kind error messages** with source snippets, `^` pointers, and fix suggestions
 - **Warnings** for unused variables with actionable hints
 - **Debug levels** — `--debug basic`, `--debug verbose`, `--debug trace`
-- **Fast** — runs simple programs in ~50 microseconds
+- **Fast** — runs simple programs in ~200 microseconds
 
 ---
 
 ## Error Messages
 
 Luma's errors are designed to be friendly, not terse:
-
 ```
 [E001] Error: Missing semicolon
    ╭─[ main.lm:3:14 ]
@@ -67,7 +67,6 @@ Luma's errors are designed to be friendly, not terse:
 ```
 
 Warnings use `[?]` instead of `[!]` so they feel less alarming:
-
 ```
 [?] Warning: Unused variable: 'x'
    ╭─[ main.lm:2:9 ]
@@ -87,7 +86,6 @@ Warnings use `[?]` instead of `[!]` so they feel less alarming:
 An interactive install script is coming soon. Watch this repo for updates.
 
 ### Usage
-
 ```bash
 # Run a Luma file
 luma run main.lm
@@ -110,7 +108,6 @@ luma run main.lm --debug trace
 ### Project Structure
 
 A Luma project looks like this:
-
 ```
 myproject/
 ├── lm/
@@ -132,7 +129,6 @@ myproject/
 | `bool` | `bool done = false;` |
 
 ### Control Flow
-
 ```luma
 # If / else if / else
 if x > 10 {
@@ -159,6 +155,21 @@ match x {
 }
 ```
 
+### Operators
+```luma
+# Arithmetic
+x + y    x - y    x * y    x / y
+
+# Comparison
+x == y   x != y   x > y   x < y   x >= y   x <= y
+
+# Logical
+x && y   x || y
+
+# Compound assignment
+x += 1   x -= 1   x *= 2   x /= 2
+```
+
 ### Built-in Functions
 
 | Function | Description |
@@ -171,24 +182,10 @@ match x {
 | `random(min, max)` | Random integer between min and max (inclusive) |
 
 ### String Interpolation
-
 ```luma
 string name = "world";
 int count = 42;
 print("Hello, &{name}! Count is &{count}.");
-```
-
-### Operators
-
-```luma
-# Arithmetic
-x + y    x - y    x * y    x / y
-
-# Comparison
-x == y   x != y   x > y   x < y   x >= y   x <= y
-
-# Compound assignment
-x += 1   x -= 1   x *= 2   x /= 2
 ```
 
 ---
@@ -201,20 +198,24 @@ Luma is in **active early development**. It works, but some features are still b
 - ✅ Lexer, parser, AST, interpreter
 - ✅ All four primitive types (int, float, string, bool)
 - ✅ Variable declarations with type checking
+- ✅ Proper block scoping
 - ✅ If / else if / else
 - ✅ While loops
 - ✅ Match statements with integer and range patterns
 - ✅ String interpolation
 - ✅ Compound assignments
+- ✅ Logical operators (`&&`, `||`)
+- ✅ String equality and comparison
 - ✅ Built-in functions (print, read, int, float, string, random)
 - ✅ Kind error and warning system
 - ✅ CLI (run, check, new, --time, --debug)
 
 ### Coming Soon
-- 🔲 `for` loops with `range()`
 - 🔲 User-defined functions with return values
-- 🔲 Proper block scoping
+- 🔲 `for` loops with `range()`
+- 🔲 Method chaining (`.`)
 - 🔲 More built-in functions
+- 🔲 More types (char, list, array, table)
 
 ---
 
