@@ -1,10 +1,43 @@
 // src/interpreter/control.rs
-use crate::ast::{MatchPattern, Stmt};
+use crate::ast::{Expr, MatchPattern, Stmt};
 use crate::debug::DebugLevel;
 use crate::interpreter::Interpreter;
 use crate::interpreter::value::{RuntimeError, Value};
 
 impl Interpreter {
+    pub fn execute_for(
+        &mut self,
+        var: &str,
+        start: &Expr,
+        end: &Expr,
+        body: &[Stmt],
+    ) -> Result<Value, RuntimeError> {
+        let start_val = self.evaluate_expression(start)?;
+        let end_val = self.evaluate_expression(end)?;
+
+        let (start_i, end_i) = match (start_val, end_val) {
+            (Value::Integer(s), Value::Integer(e)) => (s, e),
+            _ => {
+                return Err(RuntimeError {
+                    message: "for loop range must be integers".to_string(),
+                    line: start.line,
+                    column: start.column,
+                });
+            }
+        };
+
+        for i in start_i..end_i {
+            self.push_scope();
+            self.declare_variable(var, Value::Integer(i));
+            for stmt in body {
+                self.execute_statement(stmt)?;
+            }
+            self.pop_scope();
+        }
+
+        Ok(Value::Void)
+    }
+
     pub fn execute_call(
         &mut self,
         name: &str,
@@ -36,21 +69,17 @@ impl Interpreter {
             });
         }
 
-        // Evaluate arguments before pushing scope
         let mut arg_values = Vec::new();
         for arg in args {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
-        // Push a fresh scope for the function
         self.push_scope();
 
-        // Bind parameters
         for (param, val) in func.params.iter().zip(arg_values) {
             self.declare_variable(&param.name, val);
         }
 
-        // Execute body, catching return signals
         let mut return_value = Value::Void;
         for stmt in &func.body {
             match self.execute_statement(stmt) {

@@ -96,6 +96,12 @@ pub enum Stmt {
         condition: Expr,
         body: Vec<Stmt>,
     },
+    For {
+        var: String,
+        start: Expr,
+        end: Expr,
+        body: Vec<Stmt>,
+    },
     Match {
         value: Expr,
         arms: Vec<MatchArm>,

@@ -13,6 +13,8 @@ pub enum Keyword {
     If,
     Else,
     While,
+    For,
+    In,
     Print,
     Match,
     // Functions
@@ -36,6 +38,8 @@ impl FromStr for Keyword {
             "if" => Ok(Keyword::If),
             "else" => Ok(Keyword::Else),
             "while" => Ok(Keyword::While),
+            "for" => Ok(Keyword::For),
+            "in" => Ok(Keyword::In),
             "print" => Ok(Keyword::Print),
             "match" => Ok(Keyword::Match),
             "return" => Ok(Keyword::Return),

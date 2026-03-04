@@ -6,6 +6,7 @@ mod core;
 mod declarations;
 mod error;
 mod expressions;
+mod forloop;
 mod ifelse;
 mod matching;
 mod primary;

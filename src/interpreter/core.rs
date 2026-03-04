@@ -177,6 +177,12 @@ impl Interpreter {
                 })
             }
             Stmt::While { condition, body } => self.execute_while(condition, body),
+            Stmt::For {
+                var,
+                start,
+                end,
+                body,
+            } => self.execute_for(var, start, end, body),
             Stmt::If {
                 condition,
                 then_branch,
