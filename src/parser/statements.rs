@@ -15,6 +15,7 @@ impl Parser {
         let start_pos = self.position;
         match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Print) => self.parse_print_statement(),
+            Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Int)
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
@@ -48,6 +49,30 @@ impl Parser {
                 None
             }
         }
+    }
+
+    pub fn parse_return_statement(&mut self) -> Option<Stmt> {
+        self.advance(); // consume 'return'
+
+        // Check for bare return (no value)
+        if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+            self.advance();
+            return Some(Stmt::Return(None));
+        }
+
+        let expr = match self.parse_expression() {
+            Ok(e) => e,
+            Err(e) => {
+                self.errors.push(e);
+                return None;
+            }
+        };
+
+        if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+            self.advance();
+        }
+
+        Some(Stmt::Return(Some(expr)))
     }
 
     pub fn parse_expression_statement(&mut self) -> Result<Stmt, ParseError> {

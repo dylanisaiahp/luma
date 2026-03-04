@@ -5,6 +5,72 @@ use crate::interpreter::Interpreter;
 use crate::interpreter::value::{RuntimeError, Value};
 
 impl Interpreter {
+    pub fn execute_call(
+        &mut self,
+        name: &str,
+        args: &[crate::ast::Expr],
+        line: usize,
+        column: usize,
+    ) -> Result<Value, RuntimeError> {
+        let func = match self.functions.get(name) {
+            Some(f) => f.clone(),
+            None => {
+                return Err(RuntimeError {
+                    message: format!("Unknown function: {}", name),
+                    line,
+                    column,
+                });
+            }
+        };
+
+        if args.len() != func.params.len() {
+            return Err(RuntimeError {
+                message: format!(
+                    "{}() expects {} argument(s), got {}",
+                    name,
+                    func.params.len(),
+                    args.len()
+                ),
+                line,
+                column,
+            });
+        }
+
+        // Evaluate arguments before pushing scope
+        let mut arg_values = Vec::new();
+        for arg in args {
+            arg_values.push(self.evaluate_expression(arg)?);
+        }
+
+        // Push a fresh scope for the function
+        self.push_scope();
+
+        // Bind parameters
+        for (param, val) in func.params.iter().zip(arg_values) {
+            self.declare_variable(&param.name, val);
+        }
+
+        // Execute body, catching return signals
+        let mut return_value = Value::Void;
+        for stmt in &func.body {
+            match self.execute_statement(stmt) {
+                Ok(_) => {}
+                Err(e) if e.message.starts_with("__return__") => {
+                    let encoded = e.message.strip_prefix("__return__").unwrap_or("");
+                    return_value = Interpreter::decode_return_value(encoded);
+                    break;
+                }
+                Err(e) => {
+                    self.pop_scope();
+                    return Err(e);
+                }
+            }
+        }
+
+        self.pop_scope();
+        Ok(return_value)
+    }
+
     pub fn execute_while(
         &mut self,
         condition: &crate::ast::Expr,
@@ -130,10 +196,8 @@ impl Interpreter {
                 }
             }
             if matched {
-                crate::debug!(DebugLevel::Basic, "Match found, breaking");
                 break;
             }
-            crate::debug!(DebugLevel::Basic, "No match, continuing to next arm");
         }
 
         if !matched && let Some(else_body) = else_arm {

@@ -51,45 +51,56 @@ impl Interpreter {
             ExprKind::AssignOp { name, op, value } => {
                 self.evaluate_assign_op(name, op, value, expr.line, expr.column)
             }
-            ExprKind::Call { name, args } => match name.as_str() {
-                "read" => builtins::eval_read(args, expr.line, expr.column),
-                "int" => {
-                    if args.len() != 1 {
-                        return Err(RuntimeError {
-                            message: "int() takes exactly one argument".to_string(),
-                            line: expr.line,
-                            column: expr.column,
-                        });
+            ExprKind::Call { name, args } => {
+                // Check builtins first, then user functions
+                match name.as_str() {
+                    "read" => builtins::eval_read(args, expr.line, expr.column),
+                    "int" => {
+                        if args.len() != 1 {
+                            return Err(RuntimeError {
+                                message: "int() takes exactly one argument".to_string(),
+                                line: expr.line,
+                                column: expr.column,
+                            });
+                        }
+                        builtins::eval_int(&args[0], self, expr.line, expr.column)
                     }
-                    builtins::eval_int(&args[0], self, expr.line, expr.column)
-                }
-                "float" => {
-                    if args.len() != 1 {
-                        return Err(RuntimeError {
-                            message: "float() takes exactly one argument".to_string(),
-                            line: expr.line,
-                            column: expr.column,
-                        });
+                    "float" => {
+                        if args.len() != 1 {
+                            return Err(RuntimeError {
+                                message: "float() takes exactly one argument".to_string(),
+                                line: expr.line,
+                                column: expr.column,
+                            });
+                        }
+                        builtins::eval_float(&args[0], self, expr.line, expr.column)
                     }
-                    builtins::eval_float(&args[0], self, expr.line, expr.column)
-                }
-                "string" => {
-                    if args.len() != 1 {
-                        return Err(RuntimeError {
-                            message: "string() takes exactly one argument".to_string(),
-                            line: expr.line,
-                            column: expr.column,
-                        });
+                    "string" => {
+                        if args.len() != 1 {
+                            return Err(RuntimeError {
+                                message: "string() takes exactly one argument".to_string(),
+                                line: expr.line,
+                                column: expr.column,
+                            });
+                        }
+                        builtins::eval_string(&args[0], self)
                     }
-                    builtins::eval_string(&args[0], self)
+                    "random" => builtins::eval_random(args, self, expr.line, expr.column),
+                    _ => {
+                        // Check user-defined functions
+                        if self.functions.contains_key(name.as_str()) {
+                            let args_cloned = args.clone();
+                            self.execute_call(name, &args_cloned, expr.line, expr.column)
+                        } else {
+                            Err(RuntimeError {
+                                message: format!("Unknown function: {}", name),
+                                line: expr.line,
+                                column: expr.column,
+                            })
+                        }
+                    }
                 }
-                "random" => builtins::eval_random(args, self, expr.line, expr.column),
-                _ => Err(RuntimeError {
-                    message: format!("Unknown function: {}", name),
-                    line: expr.line,
-                    column: expr.column,
-                }),
-            },
+            }
             ExprKind::Range { start, end } => {
                 let start_val = self.evaluate_expression(start)?;
                 let end_val = self.evaluate_expression(end)?;

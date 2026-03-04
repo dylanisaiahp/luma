@@ -79,6 +79,17 @@ impl Parser {
         }
     }
 
+    // Look ahead to check if this is a function declaration (type name followed by identifier then LParen)
+    fn is_typed_function(&self) -> bool {
+        if let Some(next) = self.tokens.get(self.position + 1)
+            && let TokenKind::Identifier(_) = &next.kind
+            && let Some(after) = self.tokens.get(self.position + 2)
+        {
+            return after.kind == TokenKind::LParen;
+        }
+        false
+    }
+
     pub fn parse_program(&mut self) -> Vec<Stmt> {
         crate::debug!(DebugLevel::Basic, "Starting parse");
         let mut statements = Vec::new();
@@ -89,12 +100,6 @@ impl Parser {
                 DebugLevel::Verbose,
                 "IN LOOP - Token kind: {:?}",
                 token.kind
-            );
-            crate::debug!(
-                DebugLevel::Verbose,
-                "Processing token: {:?} at position {}",
-                token.kind,
-                self.position
             );
 
             if self.position == last_position {
@@ -114,6 +119,21 @@ impl Parser {
                 TokenKind::Void => {
                     crate::debug!(DebugLevel::Basic, "Found void, calling parse_function");
                     if let Some(func) = self.parse_function() {
+                        statements.push(func);
+                    }
+                }
+                TokenKind::Int | TokenKind::Float | TokenKind::Bool | TokenKind::String
+                    if self.is_typed_function() =>
+                {
+                    let return_type = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        _ => unreachable!(),
+                    };
+                    self.advance(); // consume return type
+                    if let Some(func) = self.parse_typed_function(return_type) {
                         statements.push(func);
                     }
                 }

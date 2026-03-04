@@ -7,16 +7,8 @@ use crate::parser::error::ParseError;
 use super::Parser;
 
 impl Parser {
-    pub fn parse_function(&mut self) -> Option<Stmt> {
-        let start_pos = self.position;
-
-        // Try to parse void
-        if self.expect_token(TokenKind::Void).is_err() {
-            crate::debug!(DebugLevel::Basic, "Failed to parse void");
-            self.position = start_pos;
-            return None;
-        }
-
+    // Parse typed function: int add(int x, int y) { ... }
+    pub fn parse_typed_function(&mut self, return_type: String) -> Option<Stmt> {
         let name = match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Identifier(name)) => {
                 let name = name.clone();
@@ -24,7 +16,6 @@ impl Parser {
                 name
             }
             _ => {
-                crate::debug!(DebugLevel::Basic, "Failed to parse function name");
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
                     expected: "function name".to_string(),
@@ -32,29 +23,76 @@ impl Parser {
                     line_num: token.line,
                     col_num: token.column,
                 });
-                self.synchronize();
                 return None;
             }
         };
 
         if let Err(e) = self.expect_token(TokenKind::LParen) {
-            crate::debug!(DebugLevel::Basic, "Failed to parse LParen");
             self.errors.push(e);
-            self.synchronize();
             return None;
         }
 
+        // Parse parameters
+        let mut params = Vec::new();
+        while let Some(token) = self.current_token() {
+            if token.kind == TokenKind::RParen {
+                break;
+            }
+
+            let param_type = match self.current_token().map(|t| &t.kind) {
+                Some(TokenKind::Int) => "int".to_string(),
+                Some(TokenKind::Float) => "float".to_string(),
+                Some(TokenKind::Bool) => "bool".to_string(),
+                Some(TokenKind::String) => "string".to_string(),
+                _ => {
+                    let token = self.current_or_eof();
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected: "parameter type".to_string(),
+                        got: token.kind,
+                        line_num: token.line,
+                        col_num: token.column,
+                    });
+                    return None;
+                }
+            };
+            self.advance();
+
+            let param_name = match self.current_token().map(|t| &t.kind) {
+                Some(TokenKind::Identifier(name)) => {
+                    let name = name.clone();
+                    self.advance();
+                    name
+                }
+                _ => {
+                    let token = self.current_or_eof();
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected: "parameter name".to_string(),
+                        got: token.kind,
+                        line_num: token.line,
+                        col_num: token.column,
+                    });
+                    return None;
+                }
+            };
+
+            params.push(Param {
+                type_name: param_type,
+                name: param_name,
+            });
+
+            // Consume comma if present
+            if let Some(TokenKind::Comma) = self.current_token().map(|t| &t.kind) {
+                self.advance();
+            }
+        }
+
         if let Err(e) = self.expect_token(TokenKind::RParen) {
-            crate::debug!(DebugLevel::Basic, "Failed to parse RParen");
             self.errors.push(e);
-            self.synchronize();
             return None;
         }
 
         if let Err(e) = self.expect_token(TokenKind::LBrace) {
-            crate::debug!(DebugLevel::Basic, "Failed to parse LBrace");
             self.errors.push(e);
-            self.synchronize();
             return None;
         }
 
@@ -62,12 +100,6 @@ impl Parser {
         let mut last_body_pos = 0;
         while let Some(token) = self.current_token() {
             if self.position == last_body_pos {
-                crate::debug!(
-                    DebugLevel::Basic,
-                    "Stuck in body at pos {}, token: {:?}",
-                    self.position,
-                    token.kind
-                );
                 self.advance();
                 last_body_pos = self.position;
                 continue;
@@ -93,7 +125,89 @@ impl Parser {
             }
         }
 
-        crate::debug!(DebugLevel::Basic, "Function parsed successfully");
+        Some(Stmt::UserFunction {
+            return_type,
+            name,
+            params,
+            body,
+        })
+    }
+
+    pub fn parse_function(&mut self) -> Option<Stmt> {
+        let start_pos = self.position;
+
+        if self.expect_token(TokenKind::Void).is_err() {
+            crate::debug!(DebugLevel::Basic, "Failed to parse void");
+            self.position = start_pos;
+            return None;
+        }
+
+        let name = match self.current_token().map(|t| &t.kind) {
+            Some(TokenKind::Identifier(name)) => {
+                let name = name.clone();
+                self.advance();
+                name
+            }
+            _ => {
+                let token = self.current_or_eof();
+                self.errors.push(ParseError::UnexpectedToken {
+                    expected: "function name".to_string(),
+                    got: token.kind,
+                    line_num: token.line,
+                    col_num: token.column,
+                });
+                self.synchronize();
+                return None;
+            }
+        };
+
+        if let Err(e) = self.expect_token(TokenKind::LParen) {
+            self.errors.push(e);
+            self.synchronize();
+            return None;
+        }
+
+        if let Err(e) = self.expect_token(TokenKind::RParen) {
+            self.errors.push(e);
+            self.synchronize();
+            return None;
+        }
+
+        if let Err(e) = self.expect_token(TokenKind::LBrace) {
+            self.errors.push(e);
+            self.synchronize();
+            return None;
+        }
+
+        let mut body = Vec::new();
+        let mut last_body_pos = 0;
+        while let Some(token) = self.current_token() {
+            if self.position == last_body_pos {
+                self.advance();
+                last_body_pos = self.position;
+                continue;
+            }
+            last_body_pos = self.position;
+
+            match token.kind {
+                TokenKind::RBrace => {
+                    self.advance();
+                    break;
+                }
+                TokenKind::Eof => {
+                    self.errors.push(ParseError::UnexpectedEOF);
+                    break;
+                }
+                _ => {
+                    if let Some(stmt) = self.parse_statement() {
+                        body.push(stmt);
+                    } else {
+                        self.advance();
+                    }
+                }
+            }
+        }
+
         Some(Stmt::Function { name, body })
     }
 

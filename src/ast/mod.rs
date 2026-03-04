@@ -41,10 +41,10 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AssignOpKind {
-    Add,      // +=
-    Subtract, // -=
-    Multiply, // *=
-    Divide,   // /=
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,10 +61,22 @@ pub enum MatchPattern {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub type_name: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Program(Vec<Stmt>),
     Function {
         name: String,
+        body: Vec<Stmt>,
+    },
+    UserFunction {
+        return_type: String,
+        name: String,
+        params: Vec<Param>,
         body: Vec<Stmt>,
     },
     VariableDeclaration {
@@ -74,6 +86,7 @@ pub enum Stmt {
     },
     Print(Expr),
     Expression(Expr),
+    Return(Option<Expr>),
     If {
         condition: Expr,
         then_branch: Vec<Stmt>,
