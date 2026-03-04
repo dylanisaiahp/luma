@@ -68,7 +68,7 @@ impl Parser {
                     }
                     else_arm = Some(body);
                 }
-                TokenKind::Underscore => {
+                TokenKind::Identifier(ref s) if s == "_" => {
                     self.advance();
                     if let Err(e) = self.expect_token(TokenKind::Colon) {
                         self.errors.push(e);
@@ -163,8 +163,20 @@ impl Parser {
     pub fn is_start_of_match_pattern(&self) -> bool {
         match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Number(_)) => true,
-            Some(TokenKind::Underscore) => true,
             Some(TokenKind::Identifier(name)) if name == "range" => true,
+            Some(TokenKind::Underscore) => {
+                // Only a new pattern if followed by ':'
+                matches!(
+                    self.tokens.get(self.position + 1).map(|t| &t.kind),
+                    Some(TokenKind::Colon)
+                )
+            }
+            Some(TokenKind::Identifier(name)) if name == "_" => {
+                matches!(
+                    self.tokens.get(self.position + 1).map(|t| &t.kind),
+                    Some(TokenKind::Colon)
+                )
+            }
             _ => false,
         }
     }

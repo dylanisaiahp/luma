@@ -1,0 +1,9 @@
+void main() {
+    int attempts = 8;
+
+    match attempts {
+        range(0, 3): print("Amazing!");
+        range(3, 7): print("Good Job!");
+        _: print("Good Try!");
+    }
+}

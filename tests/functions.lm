@@ -1,8 +1,14 @@
-int add(int x, int y) {
-    return x + y;
+void main() {
+    string msg = greet("Dylan");
+    print(msg);
+    bool adult = is_adult(25);
+    print(adult);
 }
 
-void main() {
-    int result = add(5, 3);
-    print(result);
+string greet(string name) {
+    return "Hello, " + name;
+}
+
+bool is_adult(int age) {
+    return age >= 18;
 }
