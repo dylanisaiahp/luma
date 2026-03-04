@@ -2,6 +2,19 @@
 use crate::error::ErrorCollector;
 use crate::error::diagnostic::{Diagnostic, Span};
 
+fn hint_for_unexpected_char(ch: char) -> String {
+    match ch {
+        '%' => "Luma doesn't have a remainder operator yet. You can compute it manually: x - (x / y) * y".to_string(),
+        '^' => "'^' isn't used in Luma. For exponentiation, multiply manually or use a function.".to_string(),
+        '@' => "'@' isn't used in Luma. Maybe a typo?".to_string(),
+        '$' => "'$' isn't used in Luma. Variables don't need a prefix — just use the name directly.".to_string(),
+        '!' => "Luma uses 'not' for boolean negation: 'not done' instead of '!done'. '!=' works for not-equal.".to_string(),
+        '?' => "'?' isn't used in Luma. For optional values, 'maybe()' is coming soon.".to_string(),
+        '\\' => "Luma strings don't use backslash escapes. Use '&{var}' for interpolation.".to_string(),
+        _ => format!("'{}' isn't used in Luma. Maybe a typo?", ch),
+    }
+}
+
 impl ErrorCollector {
     pub fn add_lexer_error(&mut self, error: crate::lexer::LexerError) {
         match error {
@@ -16,10 +29,10 @@ impl ErrorCollector {
 
                 self.errors.push(Diagnostic::new_error(
                     "E005",
-                    "I found a character I don't understand",
+                    &format!("I don't understand '{}'", ch),
                     span,
                     source_line,
-                    &format!("The character '{}' isn't used in Luma. Maybe a typo?", ch),
+                    &hint_for_unexpected_char(ch),
                 ));
             }
             crate::lexer::LexerError::UnterminatedString(line, col) => {
