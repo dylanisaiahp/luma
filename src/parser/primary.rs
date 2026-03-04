@@ -12,6 +12,15 @@ impl Parser {
                 let col = token.column;
 
                 match token.kind {
+                    TokenKind::Not => {
+                        self.advance();
+                        let operand = self.parse_primary_expression()?;
+                        Ok(Expr {
+                            kind: ExprKind::Not(Box::new(operand)),
+                            line,
+                            column: col,
+                        })
+                    }
                     TokenKind::LParen => {
                         self.advance();
                         let expr = self.parse_expression()?;

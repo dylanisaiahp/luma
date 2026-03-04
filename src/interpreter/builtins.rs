@@ -139,3 +139,33 @@ pub fn eval_random(
         }),
     }
 }
+
+pub fn eval_write(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "write() takes exactly one argument".to_string(),
+            line,
+            column,
+        });
+    }
+    let val = interpreter.evaluate_expression(&args[0])?;
+    let s = match &val {
+        Value::String(s) => s.clone(),
+        Value::Integer(n) => n.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::Boolean(b) => b.to_string(),
+        Value::Void => "void".to_string(),
+    };
+    print!("{}", s);
+    io::stdout().flush().map_err(|e| RuntimeError {
+        message: format!("Failed to flush stdout: {}", e),
+        line,
+        column,
+    })?;
+    Ok(Value::Void)
+}

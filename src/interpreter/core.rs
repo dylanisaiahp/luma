@@ -193,6 +193,11 @@ impl Interpreter {
                 arms,
                 else_arm,
             } => self.execute_match(value, arms, else_arm),
+            Stmt::Break => Err(RuntimeError {
+                message: "__break__".to_string(),
+                line: 0,
+                column: 0,
+            }),
         }
     }
 

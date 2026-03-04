@@ -15,6 +15,7 @@ pub enum ExprKind {
     Boolean(bool),
     Identifier(String),
     Interpolation(String),
+    Not(Box<Expr>),
     BinaryOp {
         left: Box<Expr>,
         op: crate::syntax::BinaryOp,
@@ -87,6 +88,7 @@ pub enum Stmt {
     Print(Expr),
     Expression(Expr),
     Return(Option<Expr>),
+    Break,
     If {
         condition: Expr,
         then_branch: Vec<Stmt>,

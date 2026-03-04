@@ -3,13 +3,11 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
-    // Types
     Int,
     Float,
     String,
     Bool,
     Void,
-    // Statements
     If,
     Else,
     While,
@@ -17,17 +15,16 @@ pub enum Keyword {
     In,
     Print,
     Match,
-    // Functions
     Return,
     Read,
-    // Literals
     True,
     False,
+    Not,
+    Break,
 }
 
 impl FromStr for Keyword {
     type Err = ();
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "int" => Ok(Keyword::Int),
@@ -46,6 +43,8 @@ impl FromStr for Keyword {
             "read" => Ok(Keyword::Read),
             "true" => Ok(Keyword::True),
             "false" => Ok(Keyword::False),
+            "not" => Ok(Keyword::Not),
+            "break" => Ok(Keyword::Break),
             _ => Err(()),
         }
     }

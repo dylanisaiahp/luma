@@ -29,10 +29,24 @@ impl Interpreter {
         for i in start_i..end_i {
             self.push_scope();
             self.declare_variable(var, Value::Integer(i));
+            let mut should_break = false;
             for stmt in body {
-                self.execute_statement(stmt)?;
+                match self.execute_statement(stmt) {
+                    Ok(_) => {}
+                    Err(e) if e.message == "__break__" => {
+                        should_break = true;
+                        break;
+                    }
+                    Err(e) => {
+                        self.pop_scope();
+                        return Err(e);
+                    }
+                }
             }
             self.pop_scope();
+            if should_break {
+                break;
+            }
         }
 
         Ok(Value::Void)
@@ -110,10 +124,24 @@ impl Interpreter {
             match cond_val {
                 Value::Boolean(true) => {
                     self.push_scope();
+                    let mut should_break = false;
                     for stmt in body {
-                        self.execute_statement(stmt)?;
+                        match self.execute_statement(stmt) {
+                            Ok(_) => {}
+                            Err(e) if e.message == "__break__" => {
+                                should_break = true;
+                                break;
+                            }
+                            Err(e) => {
+                                self.pop_scope();
+                                return Err(e);
+                            }
+                        }
                     }
                     self.pop_scope();
+                    if should_break {
+                        break;
+                    }
                 }
                 Value::Boolean(false) => break,
                 _ => {

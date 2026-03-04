@@ -1,0 +1,6 @@
+void main() {
+    print("Will this work?");
+    write("User: ");
+    string name = read();
+    write("&{name}: ");
+}

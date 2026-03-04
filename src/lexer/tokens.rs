@@ -28,6 +28,8 @@ pub enum TokenKind {
     Match,
     True,
     False,
+    Not,
+    Break,
 
     // Literals
     Identifier(String),
@@ -38,13 +40,13 @@ pub enum TokenKind {
     // Special patterns
     Underscore,
 
-    // Arithmetic operators
+    // Arithmetic
     Plus,
     Minus,
     Star,
     Slash,
 
-    // Comparison operators
+    // Comparison
     Greater,
     Less,
     GreaterEqual,
@@ -52,18 +54,18 @@ pub enum TokenKind {
     EqualEqual,
     BangEqual,
 
-    // Logical operators
+    // Logical
     And,
     Or,
 
-    // Assignment operators
+    // Assignment
     Equals,
     PlusEquals,
     MinusEquals,
     StarEquals,
     SlashEquals,
 
-    // Range operator
+    // Range
     DotDot,
 
     // Symbols
@@ -102,6 +104,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Match => write!(f, "match"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
+            TokenKind::Not => write!(f, "not"),
+            TokenKind::Break => write!(f, "break"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -158,6 +162,8 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Read => TokenKind::Read,
             crate::syntax::Keyword::True => TokenKind::True,
             crate::syntax::Keyword::False => TokenKind::False,
+            crate::syntax::Keyword::Not => TokenKind::Not,
+            crate::syntax::Keyword::Break => TokenKind::Break,
         }
     }
 }

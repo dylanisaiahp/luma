@@ -17,6 +17,17 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
+            ExprKind::Not(operand) => {
+                let val = self.evaluate_expression(operand)?;
+                match val {
+                    Value::Boolean(b) => Ok(Value::Boolean(!b)),
+                    _ => Err(RuntimeError {
+                        message: format!("'not' requires a boolean, got {:?}", val),
+                        line: expr.line,
+                        column: expr.column,
+                    }),
+                }
+            }
             ExprKind::Identifier(name) => {
                 self.used_variables.insert(name.clone());
                 match self.get_variable(name) {
@@ -85,6 +96,7 @@ impl Interpreter {
                         }
                         builtins::eval_string(&args[0], self)
                     }
+                    "write" => builtins::eval_write(args, self, expr.line, expr.column),
                     "random" => builtins::eval_random(args, self, expr.line, expr.column),
                     _ => {
                         // Check user-defined functions

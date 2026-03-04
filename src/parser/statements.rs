@@ -16,6 +16,14 @@ impl Parser {
         match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Print) => self.parse_print_statement(),
             Some(TokenKind::Return) => self.parse_return_statement(),
+            Some(TokenKind::Break) => {
+                self.advance();
+                // consume optional semicolon
+                if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+                    self.advance();
+                }
+                Some(Stmt::Break)
+            }
             Some(TokenKind::For) => self.parse_for_statement(),
             Some(TokenKind::Int)
             | Some(TokenKind::Float)
