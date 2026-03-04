@@ -70,11 +70,8 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Program(Vec<Stmt>),
+    // All functions use this now — void functions have return_type "void"
     Function {
-        name: String,
-        body: Vec<Stmt>,
-    },
-    UserFunction {
         return_type: String,
         name: String,
         params: Vec<Param>,
@@ -108,5 +105,8 @@ pub enum Stmt {
         value: Expr,
         arms: Vec<MatchArm>,
         else_arm: Option<Vec<Stmt>>,
+    },
+    Use {
+        module: String,
     },
 }

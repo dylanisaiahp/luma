@@ -49,7 +49,6 @@ impl Parser {
             expected,
             self.current_token().map(|t| &t.kind)
         );
-
         let current = self.current_token().cloned();
         match current {
             Some(token)
@@ -79,7 +78,6 @@ impl Parser {
         }
     }
 
-    // Look ahead to check if this is a function declaration (type name followed by identifier then LParen)
     fn is_typed_function(&self) -> bool {
         if let Some(next) = self.tokens.get(self.position + 1)
             && let TokenKind::Identifier(_) = &next.kind
@@ -116,9 +114,9 @@ impl Parser {
             last_position = self.position;
 
             match token.kind {
-                TokenKind::Void => {
-                    crate::debug!(DebugLevel::Basic, "Found void, calling parse_function");
-                    if let Some(func) = self.parse_function() {
+                TokenKind::Void if self.is_typed_function() => {
+                    self.advance(); // consume 'void'
+                    if let Some(func) = self.parse_function("void".to_string()) {
                         statements.push(func);
                     }
                 }
@@ -132,10 +130,35 @@ impl Parser {
                         Some(TokenKind::String) => "string".to_string(),
                         _ => unreachable!(),
                     };
-                    self.advance(); // consume return type
-                    if let Some(func) = self.parse_typed_function(return_type) {
+                    self.advance();
+                    if let Some(func) = self.parse_function(return_type) {
                         statements.push(func);
                     }
+                }
+                TokenKind::Use => {
+                    self.advance(); // consume 'use'
+                    let module = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Identifier(name)) => {
+                            let name = name.clone();
+                            self.advance();
+                            name
+                        }
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "module name".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    // consume optional semicolon
+                    if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+                        self.advance();
+                    }
+                    statements.push(Stmt::Use { module });
                 }
                 TokenKind::Eof => break,
                 _ => {

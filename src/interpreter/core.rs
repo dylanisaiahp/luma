@@ -96,21 +96,24 @@ impl Interpreter {
     // First pass: register all user-defined functions before executing
     fn register_functions(&mut self, statements: &[Stmt]) {
         for stmt in statements {
-            if let Stmt::UserFunction {
+            if let Stmt::Function {
                 return_type,
                 name,
                 params,
                 body,
             } = stmt
             {
-                self.functions.insert(
-                    name.clone(),
-                    FunctionDef {
-                        _return_type: return_type.clone(),
-                        params: params.clone(),
-                        body: body.clone(),
-                    },
-                );
+                // Don't register main — it's executed directly
+                if name != "main" {
+                    self.functions.insert(
+                        name.clone(),
+                        FunctionDef {
+                            _return_type: return_type.clone(),
+                            params: params.clone(),
+                            body: body.clone(),
+                        },
+                    );
+                }
             }
         }
     }
@@ -142,7 +145,7 @@ impl Interpreter {
                 }
                 Ok(Value::Void)
             }
-            Stmt::Function { name, body } => {
+            Stmt::Function { name, body, .. } => {
                 if name == "main" {
                     self.push_scope();
                     for stmt in body {
@@ -152,8 +155,13 @@ impl Interpreter {
                 }
                 Ok(Value::Void)
             }
-            // UserFunction definitions are skipped at runtime — already registered
-            Stmt::UserFunction { .. } => Ok(Value::Void),
+            Stmt::Use { module } => {
+                eprintln!(
+                    "[!] 'use {}' — imports are not yet supported. Coming soon!",
+                    module
+                );
+                Ok(Value::Void)
+            }
             Stmt::Print(expr) => self.execute_print(expr),
             Stmt::VariableDeclaration {
                 type_name,

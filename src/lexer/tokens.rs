@@ -11,7 +11,6 @@ pub struct Token {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
-    // Keywords
     Void,
     Int,
     Float,
@@ -30,45 +29,30 @@ pub enum TokenKind {
     False,
     Not,
     Break,
-
-    // Literals
+    Use,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
     StringLiteral(String),
-
-    // Special patterns
     Underscore,
-
-    // Arithmetic
     Plus,
     Minus,
     Star,
     Slash,
-
-    // Comparison
     Greater,
     Less,
     GreaterEqual,
     LessEqual,
     EqualEqual,
     BangEqual,
-
-    // Logical
     And,
     Or,
-
-    // Assignment
     Equals,
     PlusEquals,
     MinusEquals,
     StarEquals,
     SlashEquals,
-
-    // Range
     DotDot,
-
-    // Symbols
     LParen,
     RParen,
     LBrace,
@@ -76,11 +60,7 @@ pub enum TokenKind {
     Semicolon,
     Comma,
     Colon,
-
-    // Interpolation
     Interpolation(String),
-
-    // Special
     Illegal(String),
     Eof,
 }
@@ -106,6 +86,7 @@ impl fmt::Display for TokenKind {
             TokenKind::False => write!(f, "false"),
             TokenKind::Not => write!(f, "not"),
             TokenKind::Break => write!(f, "break"),
+            TokenKind::Use => write!(f, "use"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -164,6 +145,7 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::False => TokenKind::False,
             crate::syntax::Keyword::Not => TokenKind::Not,
             crate::syntax::Keyword::Break => TokenKind::Break,
+            crate::syntax::Keyword::Use => TokenKind::Use,
         }
     }
 }
