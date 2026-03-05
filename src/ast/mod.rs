@@ -43,6 +43,10 @@ pub enum ExprKind {
         method: String,
         args: Vec<Expr>,
     },
+    TypeConstant {
+        type_name: String,
+        constant: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

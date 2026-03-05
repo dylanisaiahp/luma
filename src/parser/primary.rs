@@ -86,6 +86,39 @@ impl Parser {
                             _ => unreachable!(),
                         };
                         self.advance();
+
+                        // Check for type constant: int.max, int.min, float.max, float.min
+                        if (name == "int" || name == "float")
+                            && self.current_token().map(|t| &t.kind) == Some(&TokenKind::Dot)
+                        {
+                            // peek ahead to see if it's a known constant
+                            if let Some(next) = self.tokens.get(self.position + 1)
+                                && let TokenKind::Identifier(ref ident) = next.kind
+                                && (ident == "max" || ident == "min")
+                            {
+                                self.advance(); // consume '.'
+                                let constant = match self.current_token() {
+                                    Some(t) => {
+                                        if let TokenKind::Identifier(ref s) = t.kind {
+                                            s.clone()
+                                        } else {
+                                            unreachable!()
+                                        }
+                                    }
+                                    None => unreachable!(),
+                                };
+                                self.advance(); // consume 'max' or 'min'
+                                return Ok(Expr {
+                                    kind: ExprKind::TypeConstant {
+                                        type_name: name,
+                                        constant,
+                                    },
+                                    line,
+                                    column: col,
+                                });
+                            }
+                        }
+
                         Ok(Expr {
                             kind: ExprKind::Identifier(name),
                             line,

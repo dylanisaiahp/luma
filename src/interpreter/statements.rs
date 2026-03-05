@@ -9,7 +9,13 @@ impl Interpreter {
         match val {
             Value::String(s) => println!("{}", s),
             Value::Integer(i) => println!("{}", i),
-            Value::Float(f) => println!("{}", f),
+            Value::Float(f) => {
+                if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && f != 0.0) {
+                    println!("{:e}", f)
+                } else {
+                    println!("{}", f)
+                }
+            }
             Value::Boolean(b) => println!("{}", b),
             Value::Void => println!(),
         }

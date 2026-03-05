@@ -17,6 +17,20 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
+            ExprKind::TypeConstant {
+                type_name,
+                constant,
+            } => match (type_name.as_str(), constant.as_str()) {
+                ("int", "max") => Ok(Value::Integer(i64::MAX)),
+                ("int", "min") => Ok(Value::Integer(i64::MIN)),
+                ("float", "max") => Ok(Value::Float(f64::MAX)),
+                ("float", "min") => Ok(Value::Float(f64::MIN)),
+                _ => Err(RuntimeError {
+                    message: format!("'{}' has no constant '{}'", type_name, constant),
+                    line: expr.line,
+                    column: expr.column,
+                }),
+            },
             ExprKind::Not(operand) => {
                 let val = self.evaluate_expression(operand)?;
                 match val {
