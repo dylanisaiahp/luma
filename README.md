@@ -26,6 +26,10 @@ void main() {
         print("x is greater than 3");
     }
 
+    for i in range(1, 4) {
+        write("&{i}... ");
+    }
+
     while x > 0 {
         print("&{x} remaining");
         x -= 1;
@@ -42,11 +46,15 @@ void main() {
 - **Explicit types** — `int x = 5;`, `string name = "Luma";`, `bool done = false;`
 - **No sigils** — just clear, readable keywords
 - **String interpolation** — `"Hello, &{name}!"` just works
-- **Logical operators** — `&&` and `||`
-- **Match statements** with integer and range patterns
+- **For loops** — `for i in range(1, 10) { ... }`
+- **Match statements** with integer, range, and wildcard patterns
+- **User-defined functions** with typed parameters and return values
+- **Logical operators** — `&&`, `||`, and `not`
 - **Compound assignments** — `+=`, `-=`, `*=`, `/=`
+- **Remainder operator** — `x % y`
+- **Negative literals** — `-42`, `-3.14`
 - **Proper block scoping** — variables don't leak outside their block
-- **Kind error messages** with source snippets, `^` pointers, and fix suggestions
+- **Kind error messages** — source snippets, pointers, fix suggestions, and common-mistake hints
 - **Warnings** for unused variables with actionable hints
 - **Debug levels** — `--debug basic`, `--debug verbose`, `--debug trace`
 - **Fast** — runs simple programs in ~200 microseconds
@@ -63,6 +71,17 @@ Luma's errors are designed to be friendly, not terse:
  3 │     int x = 5
    │              │
    │              ╰─ Suggestion: Add a semicolon at the end of this statement.
+───╯
+```
+
+Luma also recognizes common mistakes from other languages:
+```
+[E002] Error: I don't know what 'println' means here
+   ╭─[ main.lm:2:5 ]
+   │
+ 2 │     println("hello");
+   │     │
+   │     ╰─ Luma uses print() — it already adds a newline automatically.
 ───╯
 ```
 
@@ -128,6 +147,25 @@ myproject/
 | `string` | `string name = "Luma";` |
 | `bool` | `bool done = false;` |
 
+### Functions
+```luma
+# Void function — no return value
+void greet(string name) {
+    print("Hello, &{name}!");
+}
+
+# Typed function — returns a value
+int add(int x, int y) {
+    return x + y;
+}
+
+void main() {
+    greet("world");
+    int result = add(3, 4);
+    print(result);
+}
+```
+
 ### Control Flow
 ```luma
 # If / else if / else
@@ -144,6 +182,18 @@ while x > 0 {
     x -= 1;
 }
 
+# For loop
+for i in range(1, 6) {
+    print(i);
+}
+
+# Break out of a loop
+while true {
+    if done {
+        break;
+    }
+}
+
 # Match statement
 match x {
     1:
@@ -158,23 +208,28 @@ match x {
 ### Operators
 ```luma
 # Arithmetic
-x + y    x - y    x * y    x / y
+x + y    x - y    x * y    x / y    x % y
 
 # Comparison
 x == y   x != y   x > y   x < y   x >= y   x <= y
 
 # Logical
-x && y   x || y
+x && y   x || y   not x
 
 # Compound assignment
 x += 1   x -= 1   x *= 2   x /= 2
+
+# Negative literals
+int n = -42;
+float f = -3.14;
 ```
 
 ### Built-in Functions
 
 | Function | Description |
 |----------|-------------|
-| `print(value)` | Print a value to stdout |
+| `print(value)` | Print a value followed by a newline |
+| `write(value)` | Print a value without a newline |
 | `read()` | Read a line from stdin |
 | `int(value)` | Convert to integer |
 | `float(value)` | Convert to float |
@@ -188,6 +243,12 @@ int count = 42;
 print("Hello, &{name}! Count is &{count}.");
 ```
 
+### Imports (stub)
+```luma
+use math;
+```
+Full import system and standard library coming soon.
+
 ---
 
 ## Current State
@@ -196,26 +257,33 @@ Luma is in **active early development**. It works, but some features are still b
 
 ### Working
 - ✅ Lexer, parser, AST, interpreter
-- ✅ All four primitive types (int, float, string, bool)
+- ✅ All four primitive types (`int`, `float`, `string`, `bool`)
 - ✅ Variable declarations with type checking
 - ✅ Proper block scoping
 - ✅ If / else if / else
 - ✅ While loops
-- ✅ Match statements with integer and range patterns
+- ✅ For loops with `range()`
+- ✅ Break statement
+- ✅ Match statements with integer, range, and wildcard patterns
+- ✅ User-defined functions with typed params and return values
 - ✅ String interpolation
-- ✅ Compound assignments
-- ✅ Logical operators (`&&`, `||`)
+- ✅ Compound assignments (`+=`, `-=`, `*=`, `/=`)
+- ✅ Remainder operator (`%`)
+- ✅ Negative number literals
+- ✅ Logical operators (`&&`, `||`, `not`)
 - ✅ String equality and comparison
-- ✅ Built-in functions (print, read, int, float, string, random)
-- ✅ Kind error and warning system
-- ✅ CLI (run, check, new, --time, --debug)
+- ✅ Built-in functions (`print`, `write`, `read`, `int`, `float`, `string`, `random`)
+- ✅ Kind error and warning system with common-mistake hints
+- ✅ `use` keyword (stub — imports coming soon)
+- ✅ CLI (`run`, `check`, `new`, `--time`, `--debug`)
 
 ### Coming Soon
-- 🔲 User-defined functions with return values
-- 🔲 `for` loops with `range()`
 - 🔲 Method chaining (`.`)
-- 🔲 More built-in functions
-- 🔲 More types (char, list, array, table)
+- 🔲 User-defined type methods (`int.squared()`, `string.shout()`)
+- 🔲 `maybe<T>` type for optional values
+- 🔲 New types (`char`, `list`, `map`)
+- 🔲 Standard library (`math`, `io`, etc.)
+- 🔲 Import system + `manifest.toml`
 
 ---
 

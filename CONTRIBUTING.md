@@ -74,43 +74,66 @@ All three should pass with no warnings. If clippy flags something and you disagr
 
 ```
 src/
-├── main.rs               # Entry point
-├── cli/mod.rs            # CLI commands (run, check, new)
-├── lexer/                # Tokenization
-│   ├── mod.rs            # Lexer core + next_token
-│   ├── tokens.rs         # Token and TokenKind definitions
-│   ├── reader.rs         # Character reading helpers
-│   ├── strings.rs        # String and interpolation lexing
-│   └── comments.rs       # Comment skipping
-├── parser/               # Parsing tokens into AST
-│   ├── mod.rs            # Parser core
-│   ├── expressions.rs    # Expression parsing
-│   ├── statements.rs     # Statement parsing
-│   ├── declarations.rs   # Variable and function declarations
-│   └── error.rs          # ParseError type
-├── ast/mod.rs            # AST node definitions
-├── interpreter/          # Tree-walking interpreter
-│   ├── mod.rs            # Interpreter core + statement execution
-│   ├── expressions.rs    # Expression evaluation
-│   ├── operations.rs     # Binary operation dispatch
-│   ├── builtins.rs       # Built-in functions
-│   └── value.rs          # Value type + RuntimeError
-├── error/                # Error reporting
-│   ├── mod.rs
-│   ├── collector.rs      # ErrorCollector — aggregates all errors
-│   └── diagnostic.rs     # Diagnostic, Span, Severity
-├── syntax/               # Language primitives
-│   ├── mod.rs
-│   ├── keywords.rs       # Keyword enum
-│   └── operators.rs      # BinaryOp enum
-└── debug.rs              # Debug macro and level control
+├── main.rs                      # Entry point
+├── lib.rs                       # Library root
+├── debug.rs                     # Debug macro and level control
+├── cli/
+│   └── mod.rs                   # CLI commands (run, check, new, --time, --debug)
+├── lexer/
+│   ├── mod.rs                   # Lexer exports
+│   ├── core.rs                  # Tokenization loop
+│   ├── tokens.rs                # Token and TokenKind definitions
+│   ├── reader.rs                # Character reading helpers
+│   ├── strings.rs               # String and interpolation lexing
+│   ├── symbols.rs               # Operator and symbol lexing
+│   ├── identifiers.rs           # Identifier and keyword lexing
+│   └── comments.rs              # Comment skipping
+├── parser/
+│   ├── mod.rs                   # Parser exports
+│   ├── core.rs                  # Parser struct, parse_program
+│   ├── error.rs                 # ParseError type
+│   ├── expressions.rs           # Expression entry point
+│   ├── binary.rs                # Binary operator precedence parsing
+│   ├── primary.rs               # Literals, identifiers, not, unary minus
+│   ├── call.rs                  # Function call parsing
+│   ├── assignment.rs            # Assignment and compound assignment
+│   ├── statements.rs            # Statement dispatch
+│   ├── declarations.rs          # Variable and function declarations
+│   ├── ifelse.rs                # If / else if / else
+│   ├── whileloop.rs             # While loops
+│   ├── forloop.rs               # For loops with range()
+│   ├── matching.rs              # Match statements
+│   └── printing.rs              # Print and write statements
+├── ast/
+│   └── mod.rs                   # AST node definitions (Stmt, Expr, ExprKind)
+├── interpreter/
+│   ├── mod.rs                   # Interpreter exports and FunctionDef
+│   ├── core.rs                  # Interpreter struct, execute_statement
+│   ├── expressions.rs           # Expression evaluation
+│   ├── operations.rs            # Binary operation dispatch
+│   ├── builtins.rs              # Built-in functions (print, write, read, etc.)
+│   ├── assign.rs                # Variable assignment
+│   ├── statements.rs            # Statement helpers
+│   ├── control.rs               # If, while, for, match, break execution
+│   └── value.rs                 # Value type and RuntimeError
+├── error/
+│   ├── mod.rs                   # Error exports
+│   ├── collector.rs             # ErrorCollector — aggregates errors and warnings
+│   ├── diagnostic.rs            # Diagnostic, Span, Severity
+│   ├── lexer_errors.rs          # Lexer error formatting and hints
+│   ├── parse_errors.rs          # Parse error formatting and common-mistake hints
+│   └── runtime_errors.rs        # Runtime error formatting and hints
+└── syntax/
+    ├── mod.rs                   # Syntax exports
+    ├── keywords.rs              # Keyword enum and FromStr
+    └── operators.rs             # BinaryOp enum
 ```
 
 ---
 
 ## Submitting a Pull Request
 
-1. Fork the repo and create a branch from `master`
+1. Fork the repo and create a branch from `main`
 2. Make your changes
 3. Run `cargo fmt && cargo check && cargo clippy` — fix anything that comes up
 4. Test your change by running a `.lm` file that exercises what you changed
