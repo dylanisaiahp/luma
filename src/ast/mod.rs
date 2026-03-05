@@ -38,6 +38,11 @@ pub enum ExprKind {
         start: Box<Expr>,
         end: Box<Expr>,
     },
+    MethodCall {
+        object: Box<Expr>,
+        method: String,
+        args: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

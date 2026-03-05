@@ -139,6 +139,18 @@ impl Interpreter {
                 let right_val = self.evaluate_expression(right)?;
                 operations::evaluate_binary_op(left_val, right_val, op, expr.line, expr.column)
             }
+            ExprKind::MethodCall {
+                object,
+                method,
+                args,
+            } => {
+                let object_val = self.evaluate_expression(object)?;
+                let mut arg_vals = Vec::new();
+                for arg in args {
+                    arg_vals.push(self.evaluate_expression(arg)?);
+                }
+                builtins::eval_method(object_val, method, &arg_vals, expr.line, expr.column)
+            }
         }
     }
 }

@@ -169,3 +169,83 @@ pub fn eval_write(
     })?;
     Ok(Value::Void)
 }
+
+pub fn eval_method(
+    object: Value,
+    method: &str,
+    args: &[Value],
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    match (&object, method) {
+        // int methods
+        (Value::Integer(n), "abs") => Ok(Value::Integer(n.abs())),
+        (Value::Integer(n), "to_float") => Ok(Value::Float(*n as f64)),
+        (Value::Integer(n), "to_string") => Ok(Value::String(n.to_string())),
+        (Value::Integer(n), "pow") => match args.first() {
+            Some(Value::Integer(exp)) if *exp >= 0 => Ok(Value::Integer(n.pow(*exp as u32))),
+            _ => Err(RuntimeError {
+                message: "int.pow() takes one non-negative integer argument".to_string(),
+                line,
+                column,
+            }),
+        },
+
+        // float methods
+        (Value::Float(f), "abs") => Ok(Value::Float(f.abs())),
+        (Value::Float(f), "floor") => Ok(Value::Integer(f.floor() as i64)),
+        (Value::Float(f), "ceil") => Ok(Value::Integer(f.ceil() as i64)),
+        (Value::Float(f), "round") => Ok(Value::Integer(f.round() as i64)),
+        (Value::Float(f), "to_int") => Ok(Value::Integer(*f as i64)),
+        (Value::Float(f), "to_string") => Ok(Value::String(f.to_string())),
+
+        // string methods
+        (Value::String(s), "len") => Ok(Value::Integer(s.chars().count() as i64)),
+        (Value::String(s), "upper") => Ok(Value::String(s.to_uppercase())),
+        (Value::String(s), "lower") => Ok(Value::String(s.to_lowercase())),
+        (Value::String(s), "trim") => Ok(Value::String(s.trim().to_string())),
+        (Value::String(s), "reverse") => Ok(Value::String(s.chars().rev().collect())),
+        (Value::String(s), "is_empty") => Ok(Value::Boolean(s.is_empty())),
+        (Value::String(s), "contains") => match args.first() {
+            Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
+            _ => Err(RuntimeError {
+                message: "string.contains() takes one string argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::String(s), "starts_with") => match args.first() {
+            Some(Value::String(prefix)) => Ok(Value::Boolean(s.starts_with(prefix.as_str()))),
+            _ => Err(RuntimeError {
+                message: "string.starts_with() takes one string argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::String(s), "ends_with") => match args.first() {
+            Some(Value::String(suffix)) => Ok(Value::Boolean(s.ends_with(suffix.as_str()))),
+            _ => Err(RuntimeError {
+                message: "string.ends_with() takes one string argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::String(s), "repeat") => match args.first() {
+            Some(Value::Integer(n)) if *n >= 0 => Ok(Value::String(s.repeat(*n as usize))),
+            _ => Err(RuntimeError {
+                message: "string.repeat() takes one non-negative integer argument".to_string(),
+                line,
+                column,
+            }),
+        },
+
+        // bool methods
+        (Value::Boolean(b), "to_string") => Ok(Value::String(b.to_string())),
+
+        _ => Err(RuntimeError {
+            message: format!("'{}' has no method '{}'", object.type_name(), method),
+            line,
+            column,
+        }),
+    }
+}

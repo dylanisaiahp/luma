@@ -14,3 +14,15 @@ pub struct RuntimeError {
     pub line: usize,
     pub column: usize,
 }
+
+impl Value {
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Integer(_) => "int",
+            Value::Float(_) => "float",
+            Value::String(_) => "string",
+            Value::Boolean(_) => "bool",
+            Value::Void => "void",
+        }
+    }
+}

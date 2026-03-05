@@ -119,7 +119,7 @@ impl Lexer {
                     self.read_char();
                     Ok(TokenKind::DotDot)
                 } else {
-                    Err(LexerError::UnexpectedCharacter('.', line, col))
+                    Ok(TokenKind::Dot)
                 }
             }
             '(' => {

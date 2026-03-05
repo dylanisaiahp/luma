@@ -1,0 +1,18 @@
+void main() {
+    string name = "  hello world  ";
+    print(name.trim());
+    print(name.trim().upper());
+    print(name.trim().upper().len());
+    
+    int x = -5;
+    print(x.abs());
+    
+    float f = 3.7;
+    print(f.round());
+    print(f.floor());
+    print(f.ceil());
+    
+    string s = "luma";
+    print(s.contains("uma"));
+    print(s.repeat(3));
+}
