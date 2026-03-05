@@ -279,11 +279,11 @@ Luma is in **active early development**. It works, but some features are still b
 
 ### Coming Soon
 - 🔲 Method chaining (`.`)
-- 🔲 User-defined type methods (`int.squared()`, `string.shout()`)
-- 🔲 `maybe<T>` type for optional values
-- 🔲 New types (`char`, `list`, `map`)
+- 🔲 Extension methods (`int.squared()`, `string.shout()`)
+- 🔲 `maybe()` type with `.or()` for optional values
+- 🔲 New types (`char`, `list`, `table`)
 - 🔲 Standard library (`math`, `io`, etc.)
-- 🔲 Import system + `manifest.toml`
+- 🔲 Import system + `luma.toml`
 
 ---
 
