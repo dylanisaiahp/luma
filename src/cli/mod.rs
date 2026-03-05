@@ -86,13 +86,12 @@ fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
 
     // Lexing
     let mut lexer = crate::lexer::Lexer::new(&source);
-    let tokens = match lexer.tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            collector.add_lexer_error(e);
-            Vec::new() // Return empty token vector
-        }
-    };
+    let (tokens, lex_errors) = lexer.tokenize();
+
+    // Add any lexer errors to the collector
+    for error in lex_errors {
+        collector.add_lexer_error(error);
+    }
 
     // Parsing
     let mut parser = crate::parser::Parser::new(tokens);
@@ -138,13 +137,12 @@ fn check_file(file: &str) -> anyhow::Result<()> {
     let mut collector = ErrorCollector::new(&source, file);
 
     let mut lexer = crate::lexer::Lexer::new(&source);
-    let tokens = match lexer.tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            collector.add_lexer_error(e);
-            Vec::new() // Return empty token vector
-        }
-    };
+    let (tokens, lex_errors) = lexer.tokenize();
+
+    // Add any lexer errors to the collector
+    for error in lex_errors {
+        collector.add_lexer_error(error);
+    }
 
     let mut parser = crate::parser::Parser::new(tokens);
     let _statements = parser.parse_program();

@@ -11,6 +11,7 @@ fn hint_for_unexpected_char(ch: char) -> String {
         '!' => "Luma uses 'not' for boolean negation: 'not done' instead of '!done'. '!=' works for not-equal.".to_string(),
         '?' => "'?' isn't used in Luma. For optional values, 'maybe()' is coming soon.".to_string(),
         '\\' => "Luma strings don't use backslash escapes. Use '&{var}' for interpolation.".to_string(),
+        '/' => "Luma uses '#' for comments, not '//'. Try: # this is a comment".to_string(),
         _ => format!("'{}' isn't used in Luma. Maybe a typo?", ch),
     }
 }

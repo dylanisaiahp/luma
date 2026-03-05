@@ -23,10 +23,21 @@ fn hint_for_runtime(message: &str) -> (&'static str, &'static str) {
     } else if message.contains("expects") && message.contains("argument") {
         ("E013", "Check how many arguments this function takes.")
     } else if message.contains("Unknown function") {
-        (
-            "E014",
-            "This function doesn't exist. Check the spelling or define it first.",
-        )
+        let func_name = message.strip_prefix("Unknown function: ").unwrap_or("");
+        match func_name {
+            "println" | "printf" | "print_ln" => (
+                "E014",
+                "Luma uses print() — it already adds a newline automatically.",
+            ),
+            "fn" | "def" | "func" => (
+                "E014",
+                "Luma defines functions with the return type first: int add(int x) { ... }",
+            ),
+            _ => (
+                "E014",
+                "This function doesn't exist. Check the spelling or define it first.",
+            ),
+        }
     } else if message.contains("condition must be a boolean") {
         (
             "E015",

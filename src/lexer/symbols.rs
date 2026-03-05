@@ -43,6 +43,10 @@ impl Lexer {
                 if self.ch == '=' {
                     self.read_char();
                     Ok(TokenKind::SlashEquals)
+                } else if self.ch == '/' {
+                    // "//" — common mistake from other languages
+                    self.read_char();
+                    Err(LexerError::UnexpectedCharacter('/', line, col))
                 } else {
                     Ok(TokenKind::Slash)
                 }
@@ -145,6 +149,10 @@ impl Lexer {
             ':' => {
                 self.read_char();
                 Ok(TokenKind::Colon)
+            }
+            '%' => {
+                self.read_char();
+                Err(LexerError::UnexpectedCharacter('%', line, col))
             }
             _ => {
                 self.read_char();

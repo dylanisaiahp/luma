@@ -108,9 +108,10 @@ impl Lexer {
         })
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, LexerError> {
+    pub fn tokenize(&mut self) -> (Vec<Token>, Vec<LexerError>) {
         crate::debug!(DebugLevel::Basic, "Starting tokenization");
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         let mut count = 0;
         loop {
             match self.next_token() {
@@ -131,13 +132,8 @@ impl Lexer {
                     }
                 }
                 Err(e) => {
-                    tokens.push(Token {
-                        kind: TokenKind::Illegal(format!("{}", e)),
-                        line: self.line,
-                        column: self.column,
-                        byte_pos: self.byte_pos,
-                    });
-                    self.read_char();
+                    errors.push(e);
+                    // Don't push Illegal token — just skip and continue
                 }
             }
         }
@@ -146,6 +142,6 @@ impl Lexer {
             "Tokenization complete, {} tokens",
             tokens.len()
         );
-        Ok(tokens)
+        (tokens, errors)
     }
 }

@@ -1,0 +1,7 @@
+void main() {
+    hello("Dylan");
+}
+
+void hello(string name) {
+    print("Hello, &{name}");
+}

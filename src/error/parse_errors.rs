@@ -23,6 +23,7 @@ fn suggest_from_token(token: &TokenKind) -> Option<String> {
             "true" | "false" => None,
             _ => None,
         },
+        TokenKind::EqualEqual => Some("Did you mean '=' for assignment? '==' is for comparison.".to_string()),
         _ => None,
     }
 }
@@ -32,9 +33,9 @@ impl ErrorCollector {
         match error {
             crate::parser::ParseError::UnexpectedToken {
                 expected,
-                got: _,
+                got,
                 line_num,
-                col_num: _,
+                col_num,
             } => {
                 let source_line = self
                     .source
@@ -43,30 +44,53 @@ impl ErrorCollector {
                     .unwrap_or("")
                     .to_string();
 
-                let mut insertion_col = source_line.len() + 1;
-                if let Some(comment_index) = source_line.find('#') {
-                    insertion_col = comment_index + 1;
+                // Check if the token that was found is a known mistake
+                if let Some(suggestion) = suggest_from_token(&got) {
+                    let span = Span {
+                        filename: self.filename.clone(),
+                        line: line_num,
+                        column: col_num,
+                        length: 1,
+                    };
+                    self.errors.push(Diagnostic::new_error(
+                        "E002",
+                        &format!("I don't know what '{}' means here", got),
+                        span,
+                        source_line,
+                        &suggestion,
+                    ));
+                } else {
+                    let mut insertion_col = source_line.len() + 1;
+                    if let Some(comment_index) = source_line.find('#') {
+                        insertion_col = comment_index + 1;
+                    }
+                    let trimmed = source_line[..insertion_col - 1].trim_end();
+                    insertion_col = trimmed.len() + 1;
+
+                    let span = Span {
+                        filename: self.filename.clone(),
+                        line: line_num,
+                        column: insertion_col,
+                        length: 1,
+                    };
+
+                    // "statement" is an internal parser term — never show it to users
+                    if expected == "statement" {
+                        self.has_errors = true;
+                        return;
+                    }
+
+                    self.errors.push(Diagnostic::new_error(
+                        "E001",
+                        &format!("Missing {}", expected),
+                        span,
+                        source_line,
+                        &format!(
+                            "Suggestion: Add a {} at the end of this statement.",
+                            expected
+                        ),
+                    ));
                 }
-                let trimmed = source_line[..insertion_col - 1].trim_end();
-                insertion_col = trimmed.len() + 1;
-
-                let span = Span {
-                    filename: self.filename.clone(),
-                    line: line_num,
-                    column: insertion_col,
-                    length: 1,
-                };
-
-                self.errors.push(Diagnostic::new_error(
-                    "E001",
-                    &format!("Missing {}", expected),
-                    span,
-                    source_line,
-                    &format!(
-                        "Suggestion: Add a {} at the end of this statement.",
-                        expected
-                    ),
-                ));
             }
             crate::parser::ParseError::ExpectedExpression(token_kind, line_num, col_num) => {
                 let source_line = self
