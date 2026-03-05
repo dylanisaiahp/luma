@@ -24,6 +24,19 @@ pub fn evaluate_binary_op(
             }
             Ok(Value::Integer(l / r))
         }
+        (Value::Integer(l), Value::Integer(r), BinaryOp::Modulo) => {
+            if r == 0 {
+                return Err(RuntimeError {
+                    message: "Modulo by zero".to_string(),
+                    line,
+                    column,
+                });
+            }
+            Ok(Value::Integer(l % r))
+        }
+        (Value::Float(l), Value::Float(r), BinaryOp::Modulo) => Ok(Value::Float(l % r)),
+        (Value::Integer(l), Value::Float(r), BinaryOp::Modulo) => Ok(Value::Float(l as f64 % r)),
+        (Value::Float(l), Value::Integer(r), BinaryOp::Modulo) => Ok(Value::Float(l % r as f64)),
 
         // Float arithmetic
         (Value::Float(l), Value::Float(r), BinaryOp::Add) => Ok(Value::Float(l + r)),

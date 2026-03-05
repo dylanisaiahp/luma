@@ -1,0 +1,12 @@
+void main() {
+    int a = 17 % 5;
+    print(a);
+    float b = 7.5 % 2.5;
+    print(b);
+    int c = -42;
+    print(c);
+    float d = -3.14;
+    print(d);
+    int e = 0 - -5;
+    print(e);
+}

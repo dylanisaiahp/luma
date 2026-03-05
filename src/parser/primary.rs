@@ -21,6 +21,37 @@ impl Parser {
                             column: col,
                         })
                     }
+                    TokenKind::Minus => {
+                        self.advance();
+                        let operand = self.parse_primary_expression()?;
+                        // Fold negative literals at parse time
+                        match operand.kind {
+                            ExprKind::Integer(n) => Ok(Expr {
+                                kind: ExprKind::Integer(-n),
+                                line,
+                                column: col,
+                            }),
+                            ExprKind::Float(f) => Ok(Expr {
+                                kind: ExprKind::Float(-f),
+                                line,
+                                column: col,
+                            }),
+                            // For non-literals, emit 0 - x
+                            _ => Ok(Expr {
+                                kind: ExprKind::BinaryOp {
+                                    left: Box::new(Expr {
+                                        kind: ExprKind::Integer(0),
+                                        line,
+                                        column: col,
+                                    }),
+                                    op: crate::syntax::BinaryOp::Subtract,
+                                    right: Box::new(operand),
+                                },
+                                line,
+                                column: col,
+                            }),
+                        }
+                    }
                     TokenKind::LParen => {
                         self.advance();
                         let expr = self.parse_expression()?;

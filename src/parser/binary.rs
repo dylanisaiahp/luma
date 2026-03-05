@@ -14,6 +14,7 @@ impl Parser {
                 TokenKind::Minus => crate::syntax::BinaryOp::Subtract,
                 TokenKind::Star => crate::syntax::BinaryOp::Multiply,
                 TokenKind::Slash => crate::syntax::BinaryOp::Divide,
+                TokenKind::Percent => crate::syntax::BinaryOp::Modulo,
                 TokenKind::Greater => crate::syntax::BinaryOp::Greater,
                 TokenKind::Less => crate::syntax::BinaryOp::Less,
                 TokenKind::GreaterEqual => crate::syntax::BinaryOp::GreaterEqual,
@@ -34,7 +35,9 @@ impl Parser {
                 | crate::syntax::BinaryOp::GreaterEqual
                 | crate::syntax::BinaryOp::LessEqual => 20,
                 crate::syntax::BinaryOp::Add | crate::syntax::BinaryOp::Subtract => 30,
-                crate::syntax::BinaryOp::Multiply | crate::syntax::BinaryOp::Divide => 40,
+                crate::syntax::BinaryOp::Multiply
+                | crate::syntax::BinaryOp::Divide
+                | crate::syntax::BinaryOp::Modulo => 40,
             };
 
             if precedence < min_precedence {

@@ -152,7 +152,7 @@ impl Lexer {
             }
             '%' => {
                 self.read_char();
-                Err(LexerError::UnexpectedCharacter('%', line, col))
+                Ok(TokenKind::Percent)
             }
             _ => {
                 self.read_char();

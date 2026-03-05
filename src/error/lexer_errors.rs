@@ -4,7 +4,6 @@ use crate::error::diagnostic::{Diagnostic, Span};
 
 fn hint_for_unexpected_char(ch: char) -> String {
     match ch {
-        '%' => "Luma doesn't have a remainder operator yet. You can compute it manually: x - (x / y) * y".to_string(),
         '^' => "'^' isn't used in Luma. For exponentiation, multiply manually or use a function.".to_string(),
         '@' => "'@' isn't used in Luma. Maybe a typo?".to_string(),
         '$' => "'$' isn't used in Luma. Variables don't need a prefix — just use the name directly.".to_string(),
