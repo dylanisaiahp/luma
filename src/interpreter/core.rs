@@ -1,6 +1,5 @@
 // src/interpreter/core.rs
 use crate::ast::Stmt;
-use crate::debug::DebugLevel;
 use crate::error::diagnostic::Diagnostic;
 use crate::interpreter::value::{RuntimeError, Value};
 use crate::interpreter::{FunctionDef, VarInfo};
@@ -124,8 +123,6 @@ impl Interpreter {
         source: &str,
         filename: &str,
     ) -> Result<(), RuntimeError> {
-        crate::debug!(DebugLevel::Basic, "Starting interpretation");
-
         // Register all functions before executing
         if let Stmt::Program(stmts) = program {
             self.register_functions(stmts);
@@ -137,7 +134,6 @@ impl Interpreter {
     }
 
     pub fn execute_statement(&mut self, stmt: &Stmt) -> Result<Value, RuntimeError> {
-        crate::debug!(DebugLevel::Verbose, "Executing {:?}", stmt);
         match stmt {
             Stmt::Program(statements) => {
                 for stmt in statements {
@@ -216,6 +212,8 @@ impl Interpreter {
             Value::Boolean(b) => format!("bool:{}", b),
             Value::String(s) => format!("string:{}", s),
             Value::Void => "void:".to_string(),
+            Value::Maybe(Some(inner)) => format!("maybe:{}", self.encode_return_value(inner)),
+            Value::Maybe(None) => "maybe:empty".to_string(),
         }
     }
 
@@ -228,6 +226,10 @@ impl Interpreter {
             Value::Boolean(rest == "true")
         } else if let Some(rest) = encoded.strip_prefix("string:") {
             Value::String(rest.to_string())
+        } else if encoded == "maybe:empty" {
+            Value::Maybe(None)
+        } else if let Some(rest) = encoded.strip_prefix("maybe:") {
+            Value::Maybe(Some(Box::new(Self::decode_return_value(rest))))
         } else {
             Value::Void
         }

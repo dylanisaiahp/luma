@@ -6,6 +6,7 @@ pub enum Value {
     String(String),
     Boolean(bool),
     Void,
+    Maybe(Option<Box<Value>>),
 }
 
 #[derive(Debug)]
@@ -23,6 +24,7 @@ impl Value {
             Value::String(_) => "string",
             Value::Boolean(_) => "bool",
             Value::Void => "void",
+            Value::Maybe(_) => "maybe",
         }
     }
 }

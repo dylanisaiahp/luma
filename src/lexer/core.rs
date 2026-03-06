@@ -1,5 +1,4 @@
 // src/lexer/lexer.rs
-use crate::debug::DebugLevel;
 use crate::lexer::{LexerError, Token, TokenKind};
 
 pub struct Lexer {
@@ -33,14 +32,6 @@ impl Lexer {
         if let Some(token) = self.token_buffer.pop() {
             return Ok(token);
         }
-
-        crate::debug!(
-            DebugLevel::Trace,
-            "Lexer at line {}, col {}, byte {}",
-            self.line,
-            self.column,
-            self.byte_pos
-        );
         self.skip_whitespace();
 
         let line = self.line;
@@ -109,22 +100,11 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self) -> (Vec<Token>, Vec<LexerError>) {
-        crate::debug!(DebugLevel::Basic, "Starting tokenization");
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
-        let mut count = 0;
         loop {
             match self.next_token() {
                 Ok(token) => {
-                    count += 1;
-                    crate::debug!(
-                        DebugLevel::Verbose,
-                        "Token {}: {:?} at line {}, col {}",
-                        count,
-                        token.kind,
-                        token.line,
-                        token.column
-                    );
                     let is_eof = matches!(token.kind, TokenKind::Eof);
                     tokens.push(token);
                     if is_eof {
@@ -137,11 +117,6 @@ impl Lexer {
                 }
             }
         }
-        crate::debug!(
-            DebugLevel::Basic,
-            "Tokenization complete, {} tokens",
-            tokens.len()
-        );
         (tokens, errors)
     }
 }

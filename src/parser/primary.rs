@@ -149,6 +149,14 @@ impl Parser {
                             column: col,
                         })
                     }
+                    TokenKind::Empty => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Empty,
+                            line,
+                            column: col,
+                        })
+                    }
                     _ => Err(ParseError::ExpectedExpression(
                         token.kind,
                         token.line,

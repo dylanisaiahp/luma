@@ -1,7 +1,6 @@
 // src/parser/declarations.rs
 use super::Parser;
 use crate::ast::*;
-use crate::debug::DebugLevel;
 use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
@@ -39,10 +38,51 @@ impl Parser {
             }
 
             let param_type = match self.current_token().map(|t| &t.kind) {
-                Some(TokenKind::Int) => "int".to_string(),
-                Some(TokenKind::Float) => "float".to_string(),
-                Some(TokenKind::Bool) => "bool".to_string(),
-                Some(TokenKind::String) => "string".to_string(),
+                Some(TokenKind::Int) => {
+                    self.advance();
+                    "int".to_string()
+                }
+                Some(TokenKind::Float) => {
+                    self.advance();
+                    "float".to_string()
+                }
+                Some(TokenKind::Bool) => {
+                    self.advance();
+                    "bool".to_string()
+                }
+                Some(TokenKind::String) => {
+                    self.advance();
+                    "string".to_string()
+                }
+                Some(TokenKind::Maybe) => {
+                    self.advance(); // consume 'maybe'
+                    if let Err(e) = self.expect_token(TokenKind::LParen) {
+                        self.errors.push(e);
+                        return None;
+                    }
+                    let inner = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "type inside maybe()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            return None;
+                        }
+                    };
+                    self.advance(); // consume inner type
+                    if let Err(e) = self.expect_token(TokenKind::RParen) {
+                        self.errors.push(e);
+                        return None;
+                    }
+                    format!("maybe({})", inner)
+                }
                 _ => {
                     let token = self.current_or_eof();
                     self.errors.push(ParseError::UnexpectedToken {
@@ -54,7 +94,6 @@ impl Parser {
                     return None;
                 }
             };
-            self.advance();
 
             let param_name = match self.current_token().map(|t| &t.kind) {
                 Some(TokenKind::Identifier(name)) => {
@@ -122,8 +161,6 @@ impl Parser {
                 }
             }
         }
-
-        crate::debug!(DebugLevel::Basic, "Function '{}' parsed successfully", name);
         Some(Stmt::Function {
             return_type,
             name,
@@ -134,15 +171,62 @@ impl Parser {
 
     pub fn parse_variable_declaration(&mut self) -> Option<Stmt> {
         let start_pos = self.position;
+
         let type_name = match self.current_token().map(|t| &t.kind) {
-            Some(TokenKind::Int) => "int".to_string(),
-            Some(TokenKind::Float) => "float".to_string(),
-            Some(TokenKind::Bool) => "bool".to_string(),
-            Some(TokenKind::String) => "string".to_string(),
+            Some(TokenKind::Int) => {
+                self.advance();
+                "int".to_string()
+            }
+            Some(TokenKind::Float) => {
+                self.advance();
+                "float".to_string()
+            }
+            Some(TokenKind::Bool) => {
+                self.advance();
+                "bool".to_string()
+            }
+            Some(TokenKind::String) => {
+                self.advance();
+                "string".to_string()
+            }
+            Some(TokenKind::Maybe) => {
+                self.advance(); // consume 'maybe'
+
+                if let Err(e) = self.expect_token(TokenKind::LParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+
+                let inner = match self.current_token().map(|t| &t.kind) {
+                    Some(TokenKind::Int) => "int".to_string(),
+                    Some(TokenKind::Float) => "float".to_string(),
+                    Some(TokenKind::Bool) => "bool".to_string(),
+                    Some(TokenKind::String) => "string".to_string(),
+                    _ => {
+                        let token = self.current_or_eof();
+                        self.errors.push(ParseError::UnexpectedToken {
+                            expected: "type inside maybe()".to_string(),
+                            got: token.kind,
+                            line_num: token.line,
+                            col_num: token.column,
+                        });
+                        return None;
+                    }
+                };
+                self.advance(); // consume inner type
+
+                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+
+                let type_name = format!("maybe({})", inner);
+                type_name
+            }
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "type (int/float/bool/string)".to_string(),
+                    expected: "type (int/float/bool/string/maybe)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -150,7 +234,6 @@ impl Parser {
                 return None;
             }
         };
-        self.advance();
 
         let name = match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Identifier(name)) => {
@@ -200,7 +283,6 @@ impl Parser {
                 });
             }
         }
-
         Some(Stmt::VariableDeclaration {
             type_name,
             name,

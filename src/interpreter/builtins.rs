@@ -98,6 +98,8 @@ pub fn eval_string(
         Value::Float(f) => Ok(Value::String(f.to_string())),
         Value::Boolean(b) => Ok(Value::String(b.to_string())),
         Value::Void => Ok(Value::String("void".to_string())),
+        Value::Maybe(Some(inner)) => Ok(Value::String(format!("{:?}", inner))),
+        Value::Maybe(None) => Ok(Value::String("empty".to_string())),
     }
 }
 
@@ -160,6 +162,14 @@ pub fn eval_write(
         Value::Float(f) => f.to_string(),
         Value::Boolean(b) => b.to_string(),
         Value::Void => "void".to_string(),
+        Value::Maybe(Some(inner)) => match inner.as_ref() {
+            Value::String(s) => s.clone(),
+            Value::Integer(n) => n.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::Boolean(b) => b.to_string(),
+            _ => "empty".to_string(),
+        },
+        Value::Maybe(None) => "empty".to_string(),
     };
     print!("{}", s);
     io::stdout().flush().map_err(|e| RuntimeError {
@@ -241,6 +251,30 @@ pub fn eval_method(
 
         // bool methods
         (Value::Boolean(b), "to_string") => Ok(Value::String(b.to_string())),
+
+        // maybe methods
+        (Value::Maybe(inner), "exists") => Ok(Value::Boolean(inner.is_some())),
+        (Value::Maybe(Some(inner)), "or") => Ok(*inner.clone()),
+        (Value::Maybe(None), "or") => match args.first() {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError {
+                message: "maybe.or() requires a fallback value".to_string(),
+                line,
+                column,
+            }),
+        },
+        // Allow method chaining on maybe — unwrap then call method
+        (Value::Maybe(Some(inner)), method) => {
+            eval_method(*inner.clone(), method, args, line, column)
+        }
+        (Value::Maybe(None), method) => Err(RuntimeError {
+            message: format!(
+                "Cannot call '{}' on empty maybe — use .or() to provide a fallback first",
+                method
+            ),
+            line,
+            column,
+        }),
 
         _ => Err(RuntimeError {
             message: format!("'{}' has no method '{}'", object.type_name(), method),

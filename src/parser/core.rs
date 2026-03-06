@@ -1,6 +1,5 @@
 // src/parser/core.rs
 use crate::ast::*;
-use crate::debug::DebugLevel;
 use crate::lexer::{Token, TokenKind};
 use crate::parser::error::ParseError;
 
@@ -43,12 +42,6 @@ impl Parser {
     }
 
     pub fn expect_token(&mut self, expected: TokenKind) -> Result<(), ParseError> {
-        crate::debug!(
-            DebugLevel::Verbose,
-            "Expecting {:?}, current: {:?}",
-            expected,
-            self.current_token().map(|t| &t.kind)
-        );
         let current = self.current_token().cloned();
         match current {
             Some(token)
@@ -89,29 +82,27 @@ impl Parser {
     }
 
     pub fn parse_program(&mut self) -> Vec<Stmt> {
-        crate::debug!(DebugLevel::Basic, "Starting parse");
         let mut statements = Vec::new();
         let mut last_position = usize::MAX;
 
         while let Some(token) = self.current_token() {
-            crate::debug!(
-                DebugLevel::Verbose,
-                "IN LOOP - Token kind: {:?}",
-                token.kind
-            );
-
             if self.position == last_position {
-                crate::debug!(
-                    DebugLevel::Basic,
-                    "Parser stuck at position {}, token: {:?}",
-                    self.position,
-                    token.kind
-                );
                 self.advance();
                 last_position = self.position;
                 continue;
             }
             last_position = self.position;
+
+            // Check for maybe(type) function_name() pattern
+            let is_maybe_function = if token.kind == TokenKind::Maybe {
+                // look for: maybe ( type ) identifier (
+                matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
+                    && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
+                    && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
+                    && matches!(self.tokens.get(self.position + 5), Some(t) if t.kind == TokenKind::LParen)
+            } else {
+                false
+            };
 
             match token.kind {
                 TokenKind::Void if self.is_typed_function() => {
@@ -131,6 +122,39 @@ impl Parser {
                         _ => unreachable!(),
                     };
                     self.advance();
+                    if let Some(func) = self.parse_function(return_type) {
+                        statements.push(func);
+                    }
+                }
+                TokenKind::Maybe if is_maybe_function => {
+                    // maybe(int) function_name() { ... }
+                    self.advance(); // consume 'maybe'
+                    if let Err(e) = self.expect_token(TokenKind::LParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let inner = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "type inside maybe()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    self.advance(); // consume inner type
+                    if let Err(e) = self.expect_token(TokenKind::RParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let return_type = format!("maybe({})", inner);
                     if let Some(func) = self.parse_function(return_type) {
                         statements.push(func);
                     }

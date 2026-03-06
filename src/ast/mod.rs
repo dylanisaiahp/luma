@@ -47,6 +47,7 @@ pub enum ExprKind {
         type_name: String,
         constant: String,
     },
+    Empty,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

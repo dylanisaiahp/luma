@@ -1,6 +1,5 @@
 // src/interpreter/control.rs
 use crate::ast::{Expr, MatchPattern, Stmt};
-use crate::debug::DebugLevel;
 use crate::interpreter::Interpreter;
 use crate::interpreter::value::{RuntimeError, Value};
 
@@ -201,11 +200,6 @@ impl Interpreter {
         let mut matched = false;
 
         for arm in arms {
-            crate::debug!(
-                DebugLevel::Basic,
-                "Checking arm with pattern: {:?}",
-                arm.pattern
-            );
             match &arm.pattern {
                 MatchPattern::Integer(n) => {
                     if let Value::Integer(m) = &match_val
@@ -222,16 +216,7 @@ impl Interpreter {
                 }
                 MatchPattern::Range(start, end) => {
                     if let Value::Integer(m) = &match_val
-                        && {
-                            crate::debug!(
-                                DebugLevel::Basic,
-                                "Comparing {} between {} and {}",
-                                m,
-                                start,
-                                end
-                            );
-                            m >= start && m <= end
-                        }
+                        && { m >= start && m <= end }
                     {
                         self.push_scope();
                         for stmt in &arm.body {

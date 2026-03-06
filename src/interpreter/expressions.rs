@@ -7,16 +7,12 @@ use crate::interpreter::value::{RuntimeError, Value};
 
 impl Interpreter {
     pub fn evaluate_expression(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
-        crate::debug!(
-            crate::debug::DebugLevel::Verbose,
-            "Evaluating {:?}",
-            expr.kind
-        );
         match &expr.kind {
             ExprKind::Integer(n) => Ok(Value::Integer(*n)),
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
+            ExprKind::Empty => Ok(Value::Maybe(None)),
             ExprKind::TypeConstant {
                 type_name,
                 constant,
@@ -62,6 +58,14 @@ impl Interpreter {
                         Value::Boolean(b) => b.to_string(),
                         Value::Void => "void".to_string(),
                         Value::String(s) => s.clone(),
+                        Value::Maybe(Some(inner)) => match inner.as_ref() {
+                            Value::Integer(n) => n.to_string(),
+                            Value::Float(f) => f.to_string(),
+                            Value::Boolean(b) => b.to_string(),
+                            Value::String(s) => s.clone(),
+                            _ => "empty".to_string(),
+                        },
+                        Value::Maybe(None) => "empty".to_string(),
                     })),
                     None => Err(RuntimeError {
                         message: format!("Undefined variable in interpolation: {}", ident),

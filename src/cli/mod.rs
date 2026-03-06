@@ -1,6 +1,5 @@
 // src/cli/mod.rs
 use crate::ast::Stmt;
-use crate::debug::DebugLevel;
 use crate::error::ErrorCollector;
 
 use clap::{Parser, Subcommand};
@@ -78,7 +77,6 @@ fn create_project(name: &str) -> anyhow::Result<()> {
 }
 
 fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
-    crate::debug!(DebugLevel::Basic, "Running file: {}", file);
     let start = Instant::now();
 
     let source = fs::read_to_string(file)?;

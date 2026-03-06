@@ -1,17 +1,11 @@
 // src/parser/statements.rs
 use super::Parser;
 use crate::ast::*;
-use crate::debug::DebugLevel;
 use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
 impl Parser {
     pub fn parse_statement(&mut self) -> Option<Stmt> {
-        crate::debug!(
-            DebugLevel::Verbose,
-            "Parsing statement at pos {}",
-            self.position
-        );
         let start_pos = self.position;
         match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Print) => self.parse_print_statement(),
@@ -28,7 +22,8 @@ impl Parser {
             Some(TokenKind::Int)
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
-            | Some(TokenKind::String) => self.parse_variable_declaration(),
+            | Some(TokenKind::String)
+            | Some(TokenKind::Maybe) => self.parse_variable_declaration(),
             Some(TokenKind::If) => self.parse_if_statement(),
             Some(TokenKind::While) => self.parse_while_statement(),
             Some(TokenKind::Match) => self.parse_match_statement(),
