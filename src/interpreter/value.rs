@@ -9,6 +9,8 @@ pub enum Value {
     Maybe(Option<Box<Value>>),
     List(Vec<Value>),
     Table(Vec<(Value, Value)>),
+    FetchHandle(String), // holds the URL, .get() and .send() called as methods
+    InputHandle, // returned by input() with no args, .flag() and .option() called as methods
 }
 
 #[derive(Debug)]
@@ -29,6 +31,8 @@ impl Value {
             Value::Maybe(_) => "maybe",
             Value::List(_) => "list",
             Value::Table(_) => "table",
+            Value::FetchHandle(_) => "fetch",
+            Value::InputHandle => "input",
         }
     }
 }

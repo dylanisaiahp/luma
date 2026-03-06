@@ -19,6 +19,7 @@ clap = { version = "4.5.60", features = ["derive"] }
 colored = "3.1.1"
 rand = "0.10.0"
 thiserror = "2.0.18"
+ureq = "3.2.0"
 
 [profile.release]
 opt-level = 3          # optimize for speed (Rust default)

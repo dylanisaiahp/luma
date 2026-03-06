@@ -232,8 +232,10 @@ impl Interpreter {
             Value::Void => "void:".to_string(),
             Value::Maybe(Some(inner)) => format!("maybe:{}", self.encode_return_value(inner)),
             Value::Maybe(None) => "maybe:empty".to_string(),
-            Value::List(_) => "list:".to_string(),
-            Value::Table(_) => "table:".to_string(),
+            Value::List(_) => "list:".to_string(), // TODO: full list encoding
+            Value::Table(_) => "table:".to_string(), // TODO: full table encoding
+            Value::FetchHandle(url) => format!("fetch:{}", url),
+            Value::InputHandle => "input:".to_string(),
         }
     }
 

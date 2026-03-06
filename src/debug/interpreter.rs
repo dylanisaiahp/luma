@@ -98,5 +98,7 @@ fn format_value(val: &Value) -> String {
         Value::Maybe(None) => "Maybe(empty)".to_string(),
         Value::List(items) => format!("List({})", items.len()),
         Value::Table(pairs) => format!("Table({})", pairs.len()),
+        Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
+        Value::InputHandle => "input()".to_string(),
     }
 }

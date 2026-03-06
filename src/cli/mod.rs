@@ -21,6 +21,7 @@ pub enum Commands {
     New { name: String },
 
     /// Run a Luma file
+    #[command(trailing_var_arg = true)]
     Run {
         file: String,
         #[arg(long, help = "Show execution time")]
@@ -31,6 +32,9 @@ pub enum Commands {
             help = "Debug components: lexer, parser, interpreter, all (append :verbose for more detail)"
         )]
         debug: Vec<String>,
+        /// Extra arguments passed to the Luma program via input()
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Check a Luma file for errors
@@ -40,7 +44,12 @@ pub enum Commands {
 pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
         Commands::New { name } => create_project(&name),
-        Commands::Run { file, time, debug } => {
+        Commands::Run {
+            file,
+            time,
+            debug,
+            args: _,
+        } => {
             let flags: Vec<&str> = debug.iter().map(|s| s.as_str()).collect();
             let config = DebugConfig::from_flags(&flags);
             run_file(&file, time, config)

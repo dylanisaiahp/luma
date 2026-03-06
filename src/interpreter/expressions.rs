@@ -87,6 +87,8 @@ impl Interpreter {
             }
             ExprKind::Call { name, args } => match name.as_str() {
                 "read" => builtins::eval_read(args, expr.line, expr.column),
+                "input" => builtins::eval_input(args, self, expr.line, expr.column),
+                "fetch" => builtins::eval_fetch(args, self, expr.line, expr.column),
                 "int" => {
                     if args.len() != 1 {
                         return Err(RuntimeError {

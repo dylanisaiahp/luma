@@ -1,0 +1,6 @@
+void main() {
+    string name = read();
+    if name == "Dylan" {
+        print("Hello, Dylan!");
+    }
+}

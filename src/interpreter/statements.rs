@@ -55,6 +55,8 @@ impl Interpreter {
                     .collect();
                 format!("({})", parts.join(", "))
             }
+            Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
+            Value::InputHandle => "input()".to_string(),
         }
     }
 

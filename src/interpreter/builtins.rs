@@ -33,6 +33,69 @@ pub fn eval_read(
     Ok(Value::String(input.trim().to_string()))
 }
 
+pub fn eval_input(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    // input() with no args returns an InputHandle so .flag() and .option() work
+    // input(n) returns the nth user-provided CLI arg as a string
+    if args.is_empty() {
+        return Ok(Value::InputHandle);
+    }
+
+    if args.len() == 1 {
+        let val = interpreter.evaluate_expression(&args[0])?;
+        let index = match val {
+            Value::Integer(n) if n >= 0 => n as usize,
+            _ => {
+                return Err(RuntimeError {
+                    message: "input() index must be a non-negative integer".to_string(),
+                    line,
+                    column,
+                });
+            }
+        };
+        // Skip "luma", "run", "file.lm" — user args start at index 3
+        let user_args: Vec<String> = std::env::args().skip(3).collect();
+        return Ok(Value::String(
+            user_args.get(index).cloned().unwrap_or_default(),
+        ));
+    }
+
+    Err(RuntimeError {
+        message: "input() takes 0 or 1 arguments".to_string(),
+        line,
+        column,
+    })
+}
+
+pub fn eval_fetch(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "fetch() takes exactly one argument (url)".to_string(),
+            line,
+            column,
+        });
+    }
+
+    let url_val = interpreter.evaluate_expression(&args[0])?;
+    match url_val {
+        Value::String(url) => Ok(Value::FetchHandle(url)),
+        _ => Err(RuntimeError {
+            message: "fetch() argument must be a string URL".to_string(),
+            line,
+            column,
+        }),
+    }
+}
+
 pub fn eval_int(
     arg: &crate::ast::Expr,
     interpreter: &mut crate::interpreter::Interpreter,
@@ -171,6 +234,7 @@ pub fn eval_method(
         (Value::Integer(n), "abs") => Ok(Value::Integer(n.abs())),
         (Value::Integer(n), "to_float") => Ok(Value::Float(*n as f64)),
         (Value::Integer(n), "to_string") => Ok(Value::String(n.to_string())),
+        (Value::Integer(n), "exists") => Ok(Value::Boolean(*n != 0)),
         (Value::Integer(n), "pow") => match args.first() {
             Some(Value::Integer(exp)) if *exp >= 0 => Ok(Value::Integer(n.pow(*exp as u32))),
             _ => Err(RuntimeError {
@@ -187,6 +251,7 @@ pub fn eval_method(
         (Value::Float(f), "round") => Ok(Value::Integer(f.round() as i64)),
         (Value::Float(f), "to_int") => Ok(Value::Integer(*f as i64)),
         (Value::Float(f), "to_string") => Ok(Value::String(f.to_string())),
+        (Value::Float(f), "exists") => Ok(Value::Boolean(*f != 0.0)),
 
         // string methods
         (Value::String(s), "len") => Ok(Value::Integer(s.chars().count() as i64)),
@@ -194,7 +259,7 @@ pub fn eval_method(
         (Value::String(s), "lower") => Ok(Value::String(s.to_lowercase())),
         (Value::String(s), "trim") => Ok(Value::String(s.trim().to_string())),
         (Value::String(s), "reverse") => Ok(Value::String(s.chars().rev().collect())),
-        (Value::String(s), "is_empty") => Ok(Value::Boolean(s.is_empty())),
+        (Value::String(s), "exists") => Ok(Value::Boolean(!s.is_empty())),
         (Value::String(s), "contains") => match args.first() {
             Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
             _ => Err(RuntimeError {
@@ -230,6 +295,7 @@ pub fn eval_method(
 
         // bool methods
         (Value::Boolean(b), "to_string") => Ok(Value::String(b.to_string())),
+        (Value::Boolean(b), "exists") => Ok(Value::Boolean(*b)),
 
         // maybe methods
         (Value::Maybe(inner), "exists") => Ok(Value::Boolean(inner.is_some())),
@@ -256,7 +322,7 @@ pub fn eval_method(
 
         // list methods
         (Value::List(items), "len") => Ok(Value::Integer(items.len() as i64)),
-        (Value::List(items), "is_empty") => Ok(Value::Boolean(items.is_empty())),
+        (Value::List(items), "exists") => Ok(Value::Boolean(!items.is_empty())),
         (Value::List(items), "get") => match args.first() {
             Some(Value::Integer(i)) => {
                 let idx = *i as usize;
@@ -363,7 +429,7 @@ pub fn eval_method(
 
         // table methods
         (Value::Table(pairs), "len") => Ok(Value::Integer(pairs.len() as i64)),
-        (Value::Table(pairs), "is_empty") => Ok(Value::Boolean(pairs.is_empty())),
+        (Value::Table(pairs), "exists") => Ok(Value::Boolean(!pairs.is_empty())),
         (Value::Table(pairs), "has") => {
             let key = args.first().ok_or(RuntimeError {
                 message: "table.has() takes one argument".to_string(),
@@ -423,6 +489,102 @@ pub fn eval_method(
             let vals: Vec<Value> = pairs.iter().map(|(_, v)| v.clone()).collect();
             Ok(Value::List(vals))
         }
+
+        // fetch handle methods
+        // TODO: switch to worry(string) once worry() is implemented
+        (Value::FetchHandle(url), "get") => match ureq::get(url).call() {
+            Ok(mut response) => {
+                let body = response
+                    .body_mut()
+                    .read_to_string()
+                    .map_err(|e| RuntimeError {
+                        message: format!("fetch().get() failed to read response: {}", e),
+                        line,
+                        column,
+                    })?;
+                Ok(Value::String(body))
+            }
+            Err(e) => Err(RuntimeError {
+                message: format!("fetch().get() request failed: {}", e),
+                line,
+                column,
+            }),
+        },
+        (Value::FetchHandle(url), "send") => {
+            let body = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                Some(v) => {
+                    return Err(RuntimeError {
+                        message: format!(
+                            "fetch().send() body must be a string, got {}",
+                            v.type_name()
+                        ),
+                        line,
+                        column,
+                    });
+                }
+                None => String::new(),
+            };
+            match ureq::post(url)
+                .content_type("text/plain")
+                .send(body.as_bytes())
+            {
+                Ok(mut response) => {
+                    let resp_body =
+                        response
+                            .body_mut()
+                            .read_to_string()
+                            .map_err(|e| RuntimeError {
+                                message: format!("fetch().send() failed to read response: {}", e),
+                                line,
+                                column,
+                            })?;
+                    Ok(Value::String(resp_body))
+                }
+                Err(e) => Err(RuntimeError {
+                    message: format!("fetch().send() request failed: {}", e),
+                    line,
+                    column,
+                }),
+            }
+        }
+
+        // input handle methods
+        (Value::InputHandle, "flag") => match args.first() {
+            Some(Value::String(flag_name)) => {
+                let cli_args: Vec<String> = std::env::args().skip(3).collect();
+                let long = format!("--{}", flag_name);
+                let short = format!("-{}", &flag_name[..1]);
+                Ok(Value::Boolean(
+                    cli_args.iter().any(|a| a == &long || a == &short),
+                ))
+            }
+            _ => Err(RuntimeError {
+                message: "input().flag() takes one string argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::InputHandle, "option") => match args.first() {
+            Some(Value::String(opt_name)) => {
+                let cli_args: Vec<String> = std::env::args().skip(3).collect();
+                let long = format!("--{}", opt_name);
+                let short = format!("-{}", &opt_name[..1]);
+                let mut found = None;
+                for (i, arg) in cli_args.iter().enumerate() {
+                    if arg == &long || arg == &short {
+                        found = cli_args.get(i + 1).cloned();
+                        break;
+                    }
+                }
+                Ok(Value::String(found.unwrap_or_default()))
+            }
+            _ => Err(RuntimeError {
+                message: "input().option() takes one string argument".to_string(),
+                line,
+                column,
+            }),
+        },
 
         _ => Err(RuntimeError {
             message: format!("'{}' has no method '{}'", object.type_name(), method),
