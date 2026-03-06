@@ -32,6 +32,8 @@ pub enum TokenKind {
     Use,
     Maybe,
     Empty,
+    List,
+    Table,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
@@ -93,6 +95,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Use => write!(f, "use"),
             TokenKind::Maybe => write!(f, "maybe"),
             TokenKind::Empty => write!(f, "empty"),
+            TokenKind::List => write!(f, "list"),
+            TokenKind::Table => write!(f, "table"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -156,6 +160,8 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Use => TokenKind::Use,
             crate::syntax::Keyword::Maybe => TokenKind::Maybe,
             crate::syntax::Keyword::Empty => TokenKind::Empty,
+            crate::syntax::Keyword::List => TokenKind::List,
+            crate::syntax::Keyword::Table => TokenKind::Table,
         }
     }
 }

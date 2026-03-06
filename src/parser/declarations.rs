@@ -5,6 +5,114 @@ use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
 impl Parser {
+    // Helper: parse a simple inner type (int/float/bool/string only)
+    fn parse_inner_type(&mut self) -> Option<String> {
+        match self.current_token().map(|t| t.kind.clone()) {
+            Some(TokenKind::Int) => {
+                self.advance();
+                Some("int".to_string())
+            }
+            Some(TokenKind::Float) => {
+                self.advance();
+                Some("float".to_string())
+            }
+            Some(TokenKind::Bool) => {
+                self.advance();
+                Some("bool".to_string())
+            }
+            Some(TokenKind::String) => {
+                self.advance();
+                Some("string".to_string())
+            }
+            _ => {
+                let token = self.current_or_eof();
+                self.errors.push(ParseError::UnexpectedToken {
+                    expected: "inner type (int/float/bool/string)".to_string(),
+                    got: token.kind,
+                    line_num: token.line,
+                    col_num: token.column,
+                });
+                None
+            }
+        }
+    }
+
+    // Helper: parse a full type string
+    pub fn parse_type_string(&mut self) -> Option<String> {
+        match self.current_token().map(|t| t.kind.clone()) {
+            Some(TokenKind::Int) => {
+                self.advance();
+                Some("int".to_string())
+            }
+            Some(TokenKind::Float) => {
+                self.advance();
+                Some("float".to_string())
+            }
+            Some(TokenKind::Bool) => {
+                self.advance();
+                Some("bool".to_string())
+            }
+            Some(TokenKind::String) => {
+                self.advance();
+                Some("string".to_string())
+            }
+            Some(TokenKind::Maybe) => {
+                self.advance();
+                if let Err(e) = self.expect_token(TokenKind::LParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                let inner = self.parse_inner_type()?;
+                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                Some(format!("maybe({})", inner))
+            }
+            Some(TokenKind::List) => {
+                self.advance();
+                if let Err(e) = self.expect_token(TokenKind::LParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                let inner = self.parse_inner_type()?;
+                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                Some(format!("list({})", inner))
+            }
+            Some(TokenKind::Table) => {
+                self.advance();
+                if let Err(e) = self.expect_token(TokenKind::LParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                let key_type = self.parse_inner_type()?;
+                if let Err(e) = self.expect_token(TokenKind::Comma) {
+                    self.errors.push(e);
+                    return None;
+                }
+                let val_type = self.parse_inner_type()?;
+                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                Some(format!("table({}, {})", key_type, val_type))
+            }
+            _ => {
+                let token = self.current_or_eof();
+                self.errors.push(ParseError::UnexpectedToken {
+                    expected: "type (int/float/bool/string/maybe/list/table)".to_string(),
+                    got: token.kind,
+                    line_num: token.line,
+                    col_num: token.column,
+                });
+                None
+            }
+        }
+    }
+
     pub fn parse_function(&mut self, return_type: String) -> Option<Stmt> {
         let name = match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Identifier(name)) => {
@@ -37,63 +145,7 @@ impl Parser {
                 break;
             }
 
-            let param_type = match self.current_token().map(|t| &t.kind) {
-                Some(TokenKind::Int) => {
-                    self.advance();
-                    "int".to_string()
-                }
-                Some(TokenKind::Float) => {
-                    self.advance();
-                    "float".to_string()
-                }
-                Some(TokenKind::Bool) => {
-                    self.advance();
-                    "bool".to_string()
-                }
-                Some(TokenKind::String) => {
-                    self.advance();
-                    "string".to_string()
-                }
-                Some(TokenKind::Maybe) => {
-                    self.advance(); // consume 'maybe'
-                    if let Err(e) = self.expect_token(TokenKind::LParen) {
-                        self.errors.push(e);
-                        return None;
-                    }
-                    let inner = match self.current_token().map(|t| &t.kind) {
-                        Some(TokenKind::Int) => "int".to_string(),
-                        Some(TokenKind::Float) => "float".to_string(),
-                        Some(TokenKind::Bool) => "bool".to_string(),
-                        Some(TokenKind::String) => "string".to_string(),
-                        _ => {
-                            let token = self.current_or_eof();
-                            self.errors.push(ParseError::UnexpectedToken {
-                                expected: "type inside maybe()".to_string(),
-                                got: token.kind,
-                                line_num: token.line,
-                                col_num: token.column,
-                            });
-                            return None;
-                        }
-                    };
-                    self.advance(); // consume inner type
-                    if let Err(e) = self.expect_token(TokenKind::RParen) {
-                        self.errors.push(e);
-                        return None;
-                    }
-                    format!("maybe({})", inner)
-                }
-                _ => {
-                    let token = self.current_or_eof();
-                    self.errors.push(ParseError::UnexpectedToken {
-                        expected: "parameter type".to_string(),
-                        got: token.kind,
-                        line_num: token.line,
-                        col_num: token.column,
-                    });
-                    return None;
-                }
-            };
+            let param_type = self.parse_type_string()?;
 
             let param_name = match self.current_token().map(|t| &t.kind) {
                 Some(TokenKind::Identifier(name)) => {
@@ -161,6 +213,7 @@ impl Parser {
                 }
             }
         }
+
         Some(Stmt::Function {
             return_type,
             name,
@@ -172,68 +225,7 @@ impl Parser {
     pub fn parse_variable_declaration(&mut self) -> Option<Stmt> {
         let start_pos = self.position;
 
-        let type_name = match self.current_token().map(|t| &t.kind) {
-            Some(TokenKind::Int) => {
-                self.advance();
-                "int".to_string()
-            }
-            Some(TokenKind::Float) => {
-                self.advance();
-                "float".to_string()
-            }
-            Some(TokenKind::Bool) => {
-                self.advance();
-                "bool".to_string()
-            }
-            Some(TokenKind::String) => {
-                self.advance();
-                "string".to_string()
-            }
-            Some(TokenKind::Maybe) => {
-                self.advance(); // consume 'maybe'
-
-                if let Err(e) = self.expect_token(TokenKind::LParen) {
-                    self.errors.push(e);
-                    return None;
-                }
-
-                let inner = match self.current_token().map(|t| &t.kind) {
-                    Some(TokenKind::Int) => "int".to_string(),
-                    Some(TokenKind::Float) => "float".to_string(),
-                    Some(TokenKind::Bool) => "bool".to_string(),
-                    Some(TokenKind::String) => "string".to_string(),
-                    _ => {
-                        let token = self.current_or_eof();
-                        self.errors.push(ParseError::UnexpectedToken {
-                            expected: "type inside maybe()".to_string(),
-                            got: token.kind,
-                            line_num: token.line,
-                            col_num: token.column,
-                        });
-                        return None;
-                    }
-                };
-                self.advance(); // consume inner type
-
-                if let Err(e) = self.expect_token(TokenKind::RParen) {
-                    self.errors.push(e);
-                    return None;
-                }
-
-                let type_name = format!("maybe({})", inner);
-                type_name
-            }
-            _ => {
-                let token = self.current_or_eof();
-                self.errors.push(ParseError::UnexpectedToken {
-                    expected: "type (int/float/bool/string/maybe)".to_string(),
-                    got: token.kind,
-                    line_num: token.line,
-                    col_num: token.column,
-                });
-                return None;
-            }
-        };
+        let type_name = self.parse_type_string()?;
 
         let name = match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Identifier(name)) => {
@@ -260,12 +252,24 @@ impl Parser {
             return None;
         }
 
-        let value = match self.parse_expression() {
-            Ok(expr) => expr,
-            Err(e) => {
-                self.errors.push(e);
-                self.position = start_pos;
-                return None;
+        // Table literals need special parsing: ("key": value, ...)
+        let value = if type_name.starts_with("table") {
+            match self.parse_table_literal() {
+                Ok(expr) => expr,
+                Err(e) => {
+                    self.errors.push(e);
+                    self.position = start_pos;
+                    return None;
+                }
+            }
+        } else {
+            match self.parse_expression() {
+                Ok(expr) => expr,
+                Err(e) => {
+                    self.errors.push(e);
+                    self.position = start_pos;
+                    return None;
+                }
             }
         };
 
@@ -283,10 +287,71 @@ impl Parser {
                 });
             }
         }
+
         Some(Stmt::VariableDeclaration {
             type_name,
             name,
             value,
+        })
+    }
+
+    // Parse table literal: ("key": value, "key2": value2) or empty
+    pub fn parse_table_literal(&mut self) -> Result<Expr, ParseError> {
+        let line = self.current_or_eof().line;
+        let col = self.current_or_eof().column;
+
+        // Handle `empty`
+        if let Some(TokenKind::Empty) = self.current_token().map(|t| &t.kind) {
+            self.advance();
+            return Ok(Expr {
+                kind: ExprKind::Empty,
+                line,
+                column: col,
+            });
+        }
+
+        self.expect_token(TokenKind::LParen)?;
+
+        let mut pairs = Vec::new();
+
+        // Empty table literal ()
+        if let Some(t) = self.current_token()
+            && t.kind == TokenKind::RParen
+        {
+            self.advance();
+            return Ok(Expr {
+                kind: ExprKind::Table(pairs),
+                line,
+                column: col,
+            });
+        }
+
+        loop {
+            let key = self.parse_expression()?;
+            self.expect_token(TokenKind::Colon)?;
+            let val = self.parse_expression()?;
+            pairs.push((key, val));
+
+            match self.current_token().map(|t| t.kind.clone()) {
+                Some(TokenKind::Comma) => {
+                    self.advance();
+                    // Allow trailing comma
+                    if let Some(t) = self.current_token()
+                        && t.kind == TokenKind::RParen
+                    {
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        self.expect_token(TokenKind::RParen)?;
+
+        Ok(Expr {
+            kind: ExprKind::Table(pairs),
+            line,
+            column: col,
         })
     }
 }

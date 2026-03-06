@@ -23,7 +23,9 @@ impl Parser {
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
             | Some(TokenKind::String)
-            | Some(TokenKind::Maybe) => self.parse_variable_declaration(),
+            | Some(TokenKind::Maybe)
+            | Some(TokenKind::List)
+            | Some(TokenKind::Table) => self.parse_variable_declaration(),
             Some(TokenKind::If) => self.parse_if_statement(),
             Some(TokenKind::While) => self.parse_while_statement(),
             Some(TokenKind::Match) => self.parse_match_statement(),

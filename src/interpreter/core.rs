@@ -194,6 +194,17 @@ impl Interpreter {
                 end,
                 body,
             } => self.execute_for(var, start, end, body),
+            Stmt::ForIn {
+                var,
+                iterable,
+                body,
+            } => self.execute_for_in(var, iterable, body),
+            Stmt::ForInTable {
+                key_var,
+                val_var,
+                iterable,
+                body,
+            } => self.execute_for_in_table(key_var, val_var, iterable, body),
             Stmt::If {
                 condition,
                 then_branch,
@@ -221,6 +232,8 @@ impl Interpreter {
             Value::Void => "void:".to_string(),
             Value::Maybe(Some(inner)) => format!("maybe:{}", self.encode_return_value(inner)),
             Value::Maybe(None) => "maybe:empty".to_string(),
+            Value::List(_) => "list:".to_string(),
+            Value::Table(_) => "table:".to_string(),
         }
     }
 

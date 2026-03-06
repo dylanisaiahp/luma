@@ -24,7 +24,6 @@ impl Parser {
                     TokenKind::Minus => {
                         self.advance();
                         let operand = self.parse_primary_expression()?;
-                        // Fold negative literals at parse time
                         match operand.kind {
                             ExprKind::Integer(n) => Ok(Expr {
                                 kind: ExprKind::Integer(-n),
@@ -36,7 +35,6 @@ impl Parser {
                                 line,
                                 column: col,
                             }),
-                            // For non-literals, emit 0 - x
                             _ => Ok(Expr {
                                 kind: ExprKind::BinaryOp {
                                     left: Box::new(Expr {
@@ -53,10 +51,55 @@ impl Parser {
                         }
                     }
                     TokenKind::LParen => {
-                        self.advance();
-                        let expr = self.parse_expression()?;
+                        self.advance(); // consume '('
+
+                        // Empty parens — not valid as a standalone expression
+                        // (empty lists use `empty` keyword)
+                        if let Some(t) = self.current_token()
+                            && t.kind == TokenKind::RParen
+                        {
+                            // () — treat as empty list literal
+                            self.advance();
+                            return Ok(Expr {
+                                kind: ExprKind::List(Vec::new()),
+                                line,
+                                column: col,
+                            });
+                        }
+
+                        // Parse first expression
+                        let first = self.parse_expression()?;
+
+                        // Check if comma follows — list literal
+                        if let Some(t) = self.current_token()
+                            && t.kind == TokenKind::Comma
+                        {
+                            // It's a list literal: (first, ...)
+                            let mut items = vec![first];
+                            while let Some(t) = self.current_token() {
+                                if t.kind != TokenKind::Comma {
+                                    break;
+                                }
+                                self.advance(); // consume ','
+                                // Allow trailing comma
+                                if let Some(t) = self.current_token()
+                                    && t.kind == TokenKind::RParen
+                                {
+                                    break;
+                                }
+                                items.push(self.parse_expression()?);
+                            }
+                            self.expect_token(TokenKind::RParen)?;
+                            return Ok(Expr {
+                                kind: ExprKind::List(items),
+                                line,
+                                column: col,
+                            });
+                        }
+
+                        // No comma — grouping expression
                         self.expect_token(TokenKind::RParen)?;
-                        Ok(expr)
+                        Ok(first)
                     }
                     TokenKind::StringLiteral(_) | TokenKind::Interpolation(_) => {
                         self.parse_string_sequence()
@@ -90,33 +133,30 @@ impl Parser {
                         // Check for type constant: int.max, int.min, float.max, float.min
                         if (name == "int" || name == "float")
                             && self.current_token().map(|t| &t.kind) == Some(&TokenKind::Dot)
+                            && let Some(next) = self.tokens.get(self.position + 1)
+                            && let TokenKind::Identifier(ref ident) = next.kind
+                            && (ident == "max" || ident == "min")
                         {
-                            // peek ahead to see if it's a known constant
-                            if let Some(next) = self.tokens.get(self.position + 1)
-                                && let TokenKind::Identifier(ref ident) = next.kind
-                                && (ident == "max" || ident == "min")
-                            {
-                                self.advance(); // consume '.'
-                                let constant = match self.current_token() {
-                                    Some(t) => {
-                                        if let TokenKind::Identifier(ref s) = t.kind {
-                                            s.clone()
-                                        } else {
-                                            unreachable!()
-                                        }
+                            self.advance(); // consume '.'
+                            let constant = match self.current_token() {
+                                Some(t) => {
+                                    if let TokenKind::Identifier(ref s) = t.kind {
+                                        s.clone()
+                                    } else {
+                                        unreachable!()
                                     }
-                                    None => unreachable!(),
-                                };
-                                self.advance(); // consume 'max' or 'min'
-                                return Ok(Expr {
-                                    kind: ExprKind::TypeConstant {
-                                        type_name: name,
-                                        constant,
-                                    },
-                                    line,
-                                    column: col,
-                                });
-                            }
+                                }
+                                None => unreachable!(),
+                            };
+                            self.advance();
+                            return Ok(Expr {
+                                kind: ExprKind::TypeConstant {
+                                    type_name: name,
+                                    constant,
+                                },
+                                line,
+                                column: col,
+                            });
                         }
 
                         Ok(Expr {

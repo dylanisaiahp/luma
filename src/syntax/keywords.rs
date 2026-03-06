@@ -24,6 +24,8 @@ pub enum Keyword {
     Use,
     Maybe,
     Empty,
+    List,
+    Table,
 }
 
 impl FromStr for Keyword {
@@ -51,6 +53,8 @@ impl FromStr for Keyword {
             "use" => Ok(Keyword::Use),
             "maybe" => Ok(Keyword::Maybe),
             "empty" => Ok(Keyword::Empty),
+            "list" => Ok(Keyword::List),
+            "table" => Ok(Keyword::Table),
             _ => Err(()),
         }
     }

@@ -7,6 +7,8 @@ pub enum Value {
     Boolean(bool),
     Void,
     Maybe(Option<Box<Value>>),
+    List(Vec<Value>),
+    Table(Vec<(Value, Value)>),
 }
 
 #[derive(Debug)]
@@ -25,6 +27,8 @@ impl Value {
             Value::Boolean(_) => "bool",
             Value::Void => "void",
             Value::Maybe(_) => "maybe",
+            Value::List(_) => "list",
+            Value::Table(_) => "table",
         }
     }
 }

@@ -51,6 +51,98 @@ impl Interpreter {
         Ok(Value::Void)
     }
 
+    pub fn execute_for_in(
+        &mut self,
+        var: &str,
+        iterable: &Expr,
+        body: &[Stmt],
+    ) -> Result<Value, RuntimeError> {
+        let list_val = self.evaluate_expression(iterable)?;
+
+        let items = match list_val {
+            Value::List(items) => items,
+            _ => {
+                return Err(RuntimeError {
+                    message: format!("for..in expects a list, got {}", list_val.type_name()),
+                    line: iterable.line,
+                    column: iterable.column,
+                });
+            }
+        };
+
+        for item in items {
+            self.push_scope();
+            self.declare_variable(var, item);
+            let mut should_break = false;
+            for stmt in body {
+                match self.execute_statement(stmt) {
+                    Ok(_) => {}
+                    Err(e) if e.message == "__break__" => {
+                        should_break = true;
+                        break;
+                    }
+                    Err(e) => {
+                        self.pop_scope();
+                        return Err(e);
+                    }
+                }
+            }
+            self.pop_scope();
+            if should_break {
+                break;
+            }
+        }
+
+        Ok(Value::Void)
+    }
+
+    pub fn execute_for_in_table(
+        &mut self,
+        key_var: &str,
+        val_var: &str,
+        iterable: &Expr,
+        body: &[Stmt],
+    ) -> Result<Value, RuntimeError> {
+        let table_val = self.evaluate_expression(iterable)?;
+
+        let pairs = match table_val {
+            Value::Table(pairs) => pairs,
+            _ => {
+                return Err(RuntimeError {
+                    message: format!("for..in expects a table, got {}", table_val.type_name()),
+                    line: iterable.line,
+                    column: iterable.column,
+                });
+            }
+        };
+
+        for (k, v) in pairs {
+            self.push_scope();
+            self.declare_variable(key_var, k);
+            self.declare_variable(val_var, v);
+            let mut should_break = false;
+            for stmt in body {
+                match self.execute_statement(stmt) {
+                    Ok(_) => {}
+                    Err(e) if e.message == "__break__" => {
+                        should_break = true;
+                        break;
+                    }
+                    Err(e) => {
+                        self.pop_scope();
+                        return Err(e);
+                    }
+                }
+            }
+            self.pop_scope();
+            if should_break {
+                break;
+            }
+        }
+
+        Ok(Value::Void)
+    }
+
     pub fn execute_call(
         &mut self,
         name: &str,
@@ -111,7 +203,6 @@ impl Interpreter {
 
         self.pop_scope();
 
-        // Log to debug
         let args_str = args
             .iter()
             .map(|_| "…".to_string())

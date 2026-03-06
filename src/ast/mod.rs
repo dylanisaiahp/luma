@@ -47,6 +47,8 @@ pub enum ExprKind {
         type_name: String,
         constant: String,
     },
+    List(Vec<Expr>),
+    Table(Vec<(Expr, Expr)>),
     Empty,
 }
 
@@ -80,7 +82,6 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Program(Vec<Stmt>),
-    // All functions use this now — void functions have return_type "void"
     Function {
         return_type: String,
         name: String,
@@ -109,6 +110,19 @@ pub enum Stmt {
         var: String,
         start: Expr,
         end: Expr,
+        body: Vec<Stmt>,
+    },
+    // for item in list
+    ForIn {
+        var: String,
+        iterable: Expr,
+        body: Vec<Stmt>,
+    },
+    // for (key, value) in table
+    ForInTable {
+        key_var: String,
+        val_var: String,
+        iterable: Expr,
         body: Vec<Stmt>,
     },
     Match {

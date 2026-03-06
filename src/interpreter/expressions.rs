@@ -13,6 +13,22 @@ impl Interpreter {
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
             ExprKind::Empty => Ok(Value::Maybe(None)),
+            ExprKind::List(items) => {
+                let mut vals = Vec::new();
+                for item in items {
+                    vals.push(self.evaluate_expression(item)?);
+                }
+                Ok(Value::List(vals))
+            }
+            ExprKind::Table(pairs) => {
+                let mut evaluated = Vec::new();
+                for (k, v) in pairs {
+                    let key = self.evaluate_expression(k)?;
+                    let val = self.evaluate_expression(v)?;
+                    evaluated.push((key, val));
+                }
+                Ok(Value::Table(evaluated))
+            }
             ExprKind::TypeConstant {
                 type_name,
                 constant,
@@ -52,21 +68,10 @@ impl Interpreter {
             ExprKind::Interpolation(ident) => {
                 self.used_variables.insert(ident.clone());
                 match self.get_variable(ident) {
-                    Some(val) => Ok(Value::String(match val {
-                        Value::Integer(n) => n.to_string(),
-                        Value::Float(f) => f.to_string(),
-                        Value::Boolean(b) => b.to_string(),
-                        Value::Void => "void".to_string(),
-                        Value::String(s) => s.clone(),
-                        Value::Maybe(Some(inner)) => match inner.as_ref() {
-                            Value::Integer(n) => n.to_string(),
-                            Value::Float(f) => f.to_string(),
-                            Value::Boolean(b) => b.to_string(),
-                            Value::String(s) => s.clone(),
-                            _ => "empty".to_string(),
-                        },
-                        Value::Maybe(None) => "empty".to_string(),
-                    })),
+                    Some(val) => {
+                        let s = self.value_to_display_string(val);
+                        Ok(Value::String(s))
+                    }
                     None => Err(RuntimeError {
                         message: format!("Undefined variable in interpolation: {}", ident),
                         line: expr.line,
@@ -80,57 +85,53 @@ impl Interpreter {
             ExprKind::AssignOp { name, op, value } => {
                 self.evaluate_assign_op(name, op, value, expr.line, expr.column)
             }
-            ExprKind::Call { name, args } => {
-                // Check builtins first, then user functions
-                match name.as_str() {
-                    "read" => builtins::eval_read(args, expr.line, expr.column),
-                    "int" => {
-                        if args.len() != 1 {
-                            return Err(RuntimeError {
-                                message: "int() takes exactly one argument".to_string(),
-                                line: expr.line,
-                                column: expr.column,
-                            });
-                        }
-                        builtins::eval_int(&args[0], self, expr.line, expr.column)
+            ExprKind::Call { name, args } => match name.as_str() {
+                "read" => builtins::eval_read(args, expr.line, expr.column),
+                "int" => {
+                    if args.len() != 1 {
+                        return Err(RuntimeError {
+                            message: "int() takes exactly one argument".to_string(),
+                            line: expr.line,
+                            column: expr.column,
+                        });
                     }
-                    "float" => {
-                        if args.len() != 1 {
-                            return Err(RuntimeError {
-                                message: "float() takes exactly one argument".to_string(),
-                                line: expr.line,
-                                column: expr.column,
-                            });
-                        }
-                        builtins::eval_float(&args[0], self, expr.line, expr.column)
+                    builtins::eval_int(&args[0], self, expr.line, expr.column)
+                }
+                "float" => {
+                    if args.len() != 1 {
+                        return Err(RuntimeError {
+                            message: "float() takes exactly one argument".to_string(),
+                            line: expr.line,
+                            column: expr.column,
+                        });
                     }
-                    "string" => {
-                        if args.len() != 1 {
-                            return Err(RuntimeError {
-                                message: "string() takes exactly one argument".to_string(),
-                                line: expr.line,
-                                column: expr.column,
-                            });
-                        }
-                        builtins::eval_string(&args[0], self)
+                    builtins::eval_float(&args[0], self, expr.line, expr.column)
+                }
+                "string" => {
+                    if args.len() != 1 {
+                        return Err(RuntimeError {
+                            message: "string() takes exactly one argument".to_string(),
+                            line: expr.line,
+                            column: expr.column,
+                        });
                     }
-                    "write" => builtins::eval_write(args, self, expr.line, expr.column),
-                    "random" => builtins::eval_random(args, self, expr.line, expr.column),
-                    _ => {
-                        // Check user-defined functions
-                        if self.functions.contains_key(name.as_str()) {
-                            let args_cloned = args.clone();
-                            self.execute_call(name, &args_cloned, expr.line, expr.column)
-                        } else {
-                            Err(RuntimeError {
-                                message: format!("Unknown function: {}", name),
-                                line: expr.line,
-                                column: expr.column,
-                            })
-                        }
+                    builtins::eval_string(&args[0], self)
+                }
+                "write" => builtins::eval_write(args, self, expr.line, expr.column),
+                "random" => builtins::eval_random(args, self, expr.line, expr.column),
+                _ => {
+                    if self.functions.contains_key(name.as_str()) {
+                        let args_cloned = args.clone();
+                        self.execute_call(name, &args_cloned, expr.line, expr.column)
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Unknown function: {}", name),
+                            line: expr.line,
+                            column: expr.column,
+                        })
                     }
                 }
-            }
+            },
             ExprKind::Range { start, end } => {
                 let start_val = self.evaluate_expression(start)?;
                 let end_val = self.evaluate_expression(end)?;

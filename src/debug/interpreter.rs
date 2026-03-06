@@ -96,5 +96,7 @@ fn format_value(val: &Value) -> String {
         Value::Void => "void".to_string(),
         Value::Maybe(Some(inner)) => format!("Maybe({})", format_value(inner)),
         Value::Maybe(None) => "Maybe(empty)".to_string(),
+        Value::List(items) => format!("List({})", items.len()),
+        Value::Table(pairs) => format!("Table({})", pairs.len()),
     }
 }

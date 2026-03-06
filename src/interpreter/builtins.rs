@@ -92,15 +92,8 @@ pub fn eval_string(
     interpreter: &mut crate::interpreter::Interpreter,
 ) -> Result<Value, RuntimeError> {
     let arg_val = interpreter.evaluate_expression(arg)?;
-    match arg_val {
-        Value::String(s) => Ok(Value::String(s)),
-        Value::Integer(n) => Ok(Value::String(n.to_string())),
-        Value::Float(f) => Ok(Value::String(f.to_string())),
-        Value::Boolean(b) => Ok(Value::String(b.to_string())),
-        Value::Void => Ok(Value::String("void".to_string())),
-        Value::Maybe(Some(inner)) => Ok(Value::String(format!("{:?}", inner))),
-        Value::Maybe(None) => Ok(Value::String("empty".to_string())),
-    }
+    let s = interpreter.value_to_display_string(&arg_val);
+    Ok(Value::String(s))
 }
 
 pub fn eval_random(
@@ -156,21 +149,7 @@ pub fn eval_write(
         });
     }
     let val = interpreter.evaluate_expression(&args[0])?;
-    let s = match &val {
-        Value::String(s) => s.clone(),
-        Value::Integer(n) => n.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::Boolean(b) => b.to_string(),
-        Value::Void => "void".to_string(),
-        Value::Maybe(Some(inner)) => match inner.as_ref() {
-            Value::String(s) => s.clone(),
-            Value::Integer(n) => n.to_string(),
-            Value::Float(f) => f.to_string(),
-            Value::Boolean(b) => b.to_string(),
-            _ => "empty".to_string(),
-        },
-        Value::Maybe(None) => "empty".to_string(),
-    };
+    let s = interpreter.value_to_display_string(&val);
     print!("{}", s);
     io::stdout().flush().map_err(|e| RuntimeError {
         message: format!("Failed to flush stdout: {}", e),
@@ -263,7 +242,6 @@ pub fn eval_method(
                 column,
             }),
         },
-        // Allow method chaining on maybe — unwrap then call method
         (Value::Maybe(Some(inner)), method) => {
             eval_method(*inner.clone(), method, args, line, column)
         }
@@ -275,6 +253,176 @@ pub fn eval_method(
             line,
             column,
         }),
+
+        // list methods
+        (Value::List(items), "len") => Ok(Value::Integer(items.len() as i64)),
+        (Value::List(items), "is_empty") => Ok(Value::Boolean(items.is_empty())),
+        (Value::List(items), "get") => match args.first() {
+            Some(Value::Integer(i)) => {
+                let idx = *i as usize;
+                match items.get(idx) {
+                    Some(v) => Ok(v.clone()),
+                    None => Err(RuntimeError {
+                        message: format!("list index {} out of bounds (len {})", i, items.len()),
+                        line,
+                        column,
+                    }),
+                }
+            }
+            _ => Err(RuntimeError {
+                message: "list.get() takes one integer argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::List(items), "contains") => {
+            let target = args.first().ok_or(RuntimeError {
+                message: "list.contains() takes one argument".to_string(),
+                line,
+                column,
+            })?;
+            Ok(Value::Boolean(items.contains(target)))
+        }
+        (Value::List(items), "where") => match args.first() {
+            Some(target) => {
+                let idx = items.iter().position(|v| v == target);
+                match idx {
+                    Some(i) => Ok(Value::Integer(i as i64)),
+                    None => Ok(Value::Integer(-1)),
+                }
+            }
+            _ => Err(RuntimeError {
+                message: "list.where() takes one argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::List(items), "add") => {
+            let val = args.first().ok_or(RuntimeError {
+                message: "list.add() takes one argument".to_string(),
+                line,
+                column,
+            })?;
+            let mut new_items = items.clone();
+            new_items.push(val.clone());
+            Ok(Value::List(new_items))
+        }
+        (Value::List(items), "remove") => match args.first() {
+            Some(Value::Integer(i)) => {
+                let idx = *i as usize;
+                if idx >= items.len() {
+                    return Err(RuntimeError {
+                        message: format!("list index {} out of bounds (len {})", i, items.len()),
+                        line,
+                        column,
+                    });
+                }
+                let mut new_items = items.clone();
+                new_items.remove(idx);
+                Ok(Value::List(new_items))
+            }
+            _ => Err(RuntimeError {
+                message: "list.remove() takes one integer index argument".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::List(items), "reverse") => {
+            let mut new_items = items.clone();
+            new_items.reverse();
+            Ok(Value::List(new_items))
+        }
+        (Value::List(items), "sort") => {
+            let mut new_items = items.clone();
+            new_items.sort_by(|a, b| match (a, b) {
+                (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
+                (Value::Float(x), Value::Float(y)) => {
+                    x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+                }
+                (Value::String(x), Value::String(y)) => x.cmp(y),
+                _ => std::cmp::Ordering::Equal,
+            });
+            Ok(Value::List(new_items))
+        }
+        (Value::List(items), "first") => match items.first() {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError {
+                message: "list.first() called on empty list".to_string(),
+                line,
+                column,
+            }),
+        },
+        (Value::List(items), "last") => match items.last() {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError {
+                message: "list.last() called on empty list".to_string(),
+                line,
+                column,
+            }),
+        },
+
+        // table methods
+        (Value::Table(pairs), "len") => Ok(Value::Integer(pairs.len() as i64)),
+        (Value::Table(pairs), "is_empty") => Ok(Value::Boolean(pairs.is_empty())),
+        (Value::Table(pairs), "has") => {
+            let key = args.first().ok_or(RuntimeError {
+                message: "table.has() takes one argument".to_string(),
+                line,
+                column,
+            })?;
+            Ok(Value::Boolean(pairs.iter().any(|(k, _)| k == key)))
+        }
+        (Value::Table(pairs), "get") => {
+            let key = args.first().ok_or(RuntimeError {
+                message: "table.get() takes one argument".to_string(),
+                line,
+                column,
+            })?;
+            match pairs.iter().find(|(k, _)| k == key) {
+                Some((_, v)) => Ok(v.clone()),
+                None => Err(RuntimeError {
+                    message: "table key not found".to_string(),
+                    line,
+                    column,
+                }),
+            }
+        }
+        (Value::Table(pairs), "set") => {
+            if args.len() != 2 {
+                return Err(RuntimeError {
+                    message: "table.set() takes two arguments (key, value)".to_string(),
+                    line,
+                    column,
+                });
+            }
+            let key = args[0].clone();
+            let val = args[1].clone();
+            let mut new_pairs = pairs.clone();
+            if let Some(entry) = new_pairs.iter_mut().find(|(k, _)| k == &key) {
+                entry.1 = val;
+            } else {
+                new_pairs.push((key, val));
+            }
+            Ok(Value::Table(new_pairs))
+        }
+        (Value::Table(pairs), "remove") => {
+            let key = args.first().ok_or(RuntimeError {
+                message: "table.remove() takes one argument".to_string(),
+                line,
+                column,
+            })?;
+            let mut new_pairs = pairs.clone();
+            new_pairs.retain(|(k, _)| k != key);
+            Ok(Value::Table(new_pairs))
+        }
+        (Value::Table(pairs), "keys") => {
+            let keys: Vec<Value> = pairs.iter().map(|(k, _)| k.clone()).collect();
+            Ok(Value::List(keys))
+        }
+        (Value::Table(pairs), "values") => {
+            let vals: Vec<Value> = pairs.iter().map(|(_, v)| v.clone()).collect();
+            Ok(Value::List(vals))
+        }
 
         _ => Err(RuntimeError {
             message: format!("'{}' has no method '{}'", object.type_name(), method),
