@@ -1,17 +1,21 @@
 // src/interpreter/core.rs
 use crate::ast::Stmt;
+use crate::debug::InterpreterDebug;
 use crate::error::diagnostic::Diagnostic;
 use crate::interpreter::value::{RuntimeError, Value};
 use crate::interpreter::{FunctionDef, VarInfo};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Interpreter {
     pub scopes: Vec<HashMap<String, Value>>,
     pub var_info: HashMap<String, VarInfo>,
     pub used_variables: HashSet<String>,
     pub warnings: Vec<Diagnostic>,
     pub functions: HashMap<String, FunctionDef>,
+    pub debug: InterpreterDebug,
+    pub output_buffer: Vec<String>,
+    pub debug_mode: bool,
 }
 
 impl Interpreter {
@@ -22,6 +26,9 @@ impl Interpreter {
             used_variables: HashSet::new(),
             warnings: Vec::new(),
             functions: HashMap::new(),
+            debug: InterpreterDebug::new(),
+            output_buffer: Vec::new(),
+            debug_mode: false,
         }
     }
 

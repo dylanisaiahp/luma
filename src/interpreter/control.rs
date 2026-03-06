@@ -110,6 +110,15 @@ impl Interpreter {
         }
 
         self.pop_scope();
+
+        // Log to debug
+        let args_str = args
+            .iter()
+            .map(|_| "…".to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.debug.log_call(name, &args_str, &return_value);
+
         Ok(return_value)
     }
 

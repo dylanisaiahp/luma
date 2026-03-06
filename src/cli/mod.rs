@@ -1,5 +1,6 @@
 // src/cli/mod.rs
 use crate::ast::Stmt;
+use crate::debug::DebugConfig;
 use crate::error::ErrorCollector;
 
 use clap::{Parser, Subcommand};
@@ -24,8 +25,12 @@ pub enum Commands {
         file: String,
         #[arg(long, help = "Show execution time")]
         time: bool,
-        #[arg(long, help = "Debug level (basic or verbose)")]
-        debug: Option<String>,
+        #[arg(
+            long,
+            num_args = 1..,
+            help = "Debug components: lexer, parser, interpreter, all (append :verbose for more detail)"
+        )]
+        debug: Vec<String>,
     },
 
     /// Check a Luma file for errors
@@ -36,15 +41,9 @@ pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
         Commands::New { name } => create_project(&name),
         Commands::Run { file, time, debug } => {
-            if let Some(level) = debug {
-                match level.as_str() {
-                    "basic" => crate::debug::set_level(crate::debug::DebugLevel::Basic),
-                    "verbose" => crate::debug::set_level(crate::debug::DebugLevel::Verbose),
-                    "trace" => crate::debug::set_level(crate::debug::DebugLevel::Trace),
-                    _ => eprintln!("Unknown debug level: {}", level),
-                }
-            }
-            run_file(&file, time)
+            let flags: Vec<&str> = debug.iter().map(|s| s.as_str()).collect();
+            let config = DebugConfig::from_flags(&flags);
+            run_file(&file, time, config)
         }
         Commands::Check { file } => check_file(&file),
     }
@@ -76,7 +75,7 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
+fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
     let start = Instant::now();
 
     let source = fs::read_to_string(file)?;
@@ -86,7 +85,10 @@ fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
     let mut lexer = crate::lexer::Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
 
-    // Add any lexer errors to the collector
+    if debug.lexer {
+        crate::debug::lexer::print_lexer_debug(&tokens, &lex_errors, debug.verbose);
+    }
+
     for error in lex_errors {
         collector.add_lexer_error(error);
     }
@@ -94,7 +96,14 @@ fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
     // Parsing
     let mut parser = crate::parser::Parser::new(tokens);
     let statements = parser.parse_program();
-    for error in parser.take_errors() {
+    let parse_errors = parser.take_errors();
+    let parse_error_count = parse_errors.len();
+
+    if debug.parser {
+        crate::debug::parser::print_parser_debug(&statements, parse_error_count, debug.verbose);
+    }
+
+    for error in parse_errors {
         collector.add_parse_error(error);
     }
 
@@ -102,23 +111,39 @@ fn run_file(file: &str, show_time: bool) -> anyhow::Result<()> {
     if !collector.has_errors() {
         let ast = Stmt::Program(statements);
         let mut interpreter = crate::interpreter::Interpreter::new();
+        interpreter.debug_mode = debug.interpreter || debug.lexer || debug.parser;
 
         match interpreter.interpret(&ast, &source, file) {
             Ok(()) => {
+                if debug.interpreter {
+                    interpreter.debug.print_debug(debug.verbose);
+                }
+                // Flush buffered output after debug
+                for line in &interpreter.output_buffer {
+                    println!("{}", line);
+                }
                 for warning in interpreter.take_warnings() {
                     collector.add_warning(warning);
                 }
             }
             Err(e) => {
+                if debug.interpreter {
+                    interpreter.debug.print_debug(debug.verbose);
+                }
+                for line in &interpreter.output_buffer {
+                    println!("{}", line);
+                }
                 collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
             }
         }
     }
 
-    // Now print everything together
+    // Print errors after debug output with spacing
+    if collector.has_errors() {
+        println!();
+    }
     collector.print_all();
 
-    // Exit once, at the very end
     if collector.has_errors() {
         std::process::exit(1);
     }
@@ -137,7 +162,6 @@ fn check_file(file: &str) -> anyhow::Result<()> {
     let mut lexer = crate::lexer::Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
 
-    // Add any lexer errors to the collector
     for error in lex_errors {
         collector.add_lexer_error(error);
     }

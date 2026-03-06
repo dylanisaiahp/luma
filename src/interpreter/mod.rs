@@ -6,7 +6,7 @@ mod core;
 mod expressions;
 mod operations;
 mod statements;
-mod value;
+pub mod value;
 
 pub use core::Interpreter;
 

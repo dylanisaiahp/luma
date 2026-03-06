@@ -6,33 +6,37 @@ use crate::interpreter::{Interpreter, VarInfo};
 impl Interpreter {
     pub fn execute_print(&mut self, expr: &crate::ast::Expr) -> Result<Value, RuntimeError> {
         let val = self.evaluate_expression(expr)?;
-        match val {
-            Value::String(s) => println!("{}", s),
-            Value::Integer(i) => println!("{}", i),
+
+        let output = match &val {
+            Value::String(s) => s.clone(),
+            Value::Integer(n) => n.to_string(),
             Value::Float(f) => {
-                if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && f != 0.0) {
-                    println!("{:e}", f)
+                if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && *f != 0.0) {
+                    format!("{:e}", f)
                 } else {
-                    println!("{}", f)
+                    f.to_string()
                 }
             }
-            Value::Boolean(b) => println!("{}", b),
-            Value::Void => println!(),
+            Value::Boolean(b) => b.to_string(),
+            Value::Void => String::new(),
             Value::Maybe(Some(inner)) => match inner.as_ref() {
-                Value::String(s) => println!("{}", s),
-                Value::Integer(n) => println!("{}", n),
-                Value::Float(f) => {
-                    if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && *f != 0.0) {
-                        println!("{:e}", f)
-                    } else {
-                        println!("{}", f)
-                    }
-                }
-                Value::Boolean(b) => println!("{}", b),
-                _ => println!("empty"),
+                Value::String(s) => s.clone(),
+                Value::Integer(n) => n.to_string(),
+                Value::Float(f) => f.to_string(),
+                Value::Boolean(b) => b.to_string(),
+                _ => "empty".to_string(),
             },
-            Value::Maybe(None) => println!("empty"),
+            Value::Maybe(None) => "empty".to_string(),
+        };
+
+        self.debug.log_print(&output);
+
+        if self.debug_mode {
+            self.output_buffer.push(output);
+        } else {
+            println!("{}", output);
         }
+
         Ok(Value::Void)
     }
 

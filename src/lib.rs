@@ -1,3 +1,4 @@
+// src/lib.rs
 pub mod ast;
 pub mod cli;
 pub mod debug;
