@@ -164,7 +164,8 @@ impl Interpreter {
                 type_name,
                 name,
                 value,
-            } => self.execute_variable_declaration(type_name, name, value),
+                else_error,
+            } => self.execute_variable_declaration(type_name, name, value, else_error),
             Stmt::Expression(expr) => {
                 self.evaluate_expression(expr)?;
                 Ok(Value::Void)
@@ -208,6 +209,21 @@ impl Interpreter {
                 arms,
                 else_arm,
             } => self.execute_match(value, arms, else_arm),
+            Stmt::Raise {
+                message,
+                line,
+                column,
+            } => {
+                let msg = match self.evaluate_expression(message)? {
+                    Value::String(s) => s,
+                    other => self.value_to_display_string(&other).to_string(),
+                };
+                Err(RuntimeError {
+                    message: format!("__raise__{}", msg),
+                    line: *line,
+                    column: *column,
+                })
+            }
             Stmt::Break => Err(RuntimeError {
                 message: "__break__".to_string(),
                 line: 0,

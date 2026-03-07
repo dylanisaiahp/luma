@@ -142,6 +142,15 @@ impl Parser {
                 false
             };
 
+            let is_worry_function = if token.kind == TokenKind::Worry {
+                matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
+                    && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
+                    && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
+                    && matches!(self.tokens.get(self.position + 5), Some(t) if t.kind == TokenKind::LParen)
+            } else {
+                false
+            };
+
             match token.kind {
                 TokenKind::Void if self.is_typed_function() => {
                     self.advance(); // consume 'void'
@@ -193,6 +202,39 @@ impl Parser {
                         continue;
                     }
                     let return_type = format!("maybe({})", inner);
+                    if let Some(func) = self.parse_function(return_type) {
+                        statements.push(func);
+                    }
+                }
+                TokenKind::Worry if is_worry_function => {
+                    // maybe(int) function_name() { ... }
+                    self.advance(); // consume 'maybe'
+                    if let Err(e) = self.expect_token(TokenKind::LParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let inner = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "type inside maybe()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    self.advance(); // consume inner type
+                    if let Err(e) = self.expect_token(TokenKind::RParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let return_type = format!("worry({})", inner);
                     if let Some(func) = self.parse_function(return_type) {
                         statements.push(func);
                     }

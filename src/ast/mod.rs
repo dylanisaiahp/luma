@@ -89,6 +89,7 @@ pub enum Stmt {
         type_name: String,
         name: String,
         value: Expr,
+        else_error: Option<(String, Vec<Stmt>)>,
     },
     Print(Expr),
     Expression(Expr),
@@ -127,5 +128,10 @@ pub enum Stmt {
     },
     Use {
         module: String,
+    },
+    Raise {
+        message: Expr,
+        line: usize,
+        column: usize,
     },
 }

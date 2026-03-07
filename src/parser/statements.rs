@@ -42,6 +42,7 @@ impl Parser {
                     None
                 }
             },
+            Some(TokenKind::Raise) => self.parse_raise_statement(),
             _ => {
                 let token = self.current_token().cloned();
                 if let Some(t) = token {
@@ -56,6 +57,31 @@ impl Parser {
                 None
             }
         }
+    }
+
+    pub fn parse_raise_statement(&mut self) -> Option<Stmt> {
+        let token = self.current_or_eof();
+        let line = token.line;
+        let column = token.column;
+        self.advance(); // consume 'raise'
+
+        let message = match self.parse_expression() {
+            Ok(e) => e,
+            Err(e) => {
+                self.errors.push(e);
+                return None;
+            }
+        };
+
+        if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+            self.advance();
+        }
+
+        Some(Stmt::Raise {
+            message,
+            line,
+            column,
+        })
     }
 
     pub fn parse_return_statement(&mut self) -> Option<Stmt> {

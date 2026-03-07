@@ -85,6 +85,19 @@ impl Parser {
                 }
                 Some(format!("maybe({})", inner))
             }
+            Some(TokenKind::Worry) => {
+                self.advance();
+                if let Err(e) = self.expect_token(TokenKind::LParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                let inner = self.parse_inner_type()?;
+                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                    self.errors.push(e);
+                    return None;
+                }
+                Some(format!("worry({})", inner))
+            }
             Some(TokenKind::List) => {
                 self.advance();
                 if let Err(e) = self.expect_token(TokenKind::LParen) {
@@ -257,18 +270,46 @@ impl Parser {
             }
         };
 
-        match self.current_token().map(|t| &t.kind) {
-            Some(TokenKind::Semicolon) => {
-                self.advance();
-            }
-            _ => {
-                let last_token = &self.tokens[self.position - 1];
-                self.errors.push(ParseError::UnexpectedToken {
-                    expected: "semicolon".to_string(),
-                    got: TokenKind::Illegal("nothing".to_string()),
-                    line_num: last_token.line,
-                    col_num: last_token.column + 1,
-                });
+        // Check for 'else error_var { body }' before semicolon
+        let else_error = if let Some(TokenKind::Else) = self.current_token().map(|t| &t.kind) {
+            self.advance(); // consume 'else'
+            let error_var = match self.current_token().map(|t| &t.kind) {
+                Some(TokenKind::Identifier(name)) => {
+                    let name = name.clone();
+                    self.advance();
+                    name
+                }
+                _ => {
+                    let token = self.current_or_eof();
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected: "error variable name".to_string(),
+                        got: token.kind,
+                        line_num: token.line,
+                        col_num: token.column,
+                    });
+                    return None;
+                }
+            };
+            let body = self.parse_block()?;
+            Some((error_var, body))
+        } else {
+            None
+        };
+
+        if else_error.is_none() {
+            match self.current_token().map(|t| &t.kind) {
+                Some(TokenKind::Semicolon) => {
+                    self.advance();
+                }
+                _ => {
+                    let last_token = &self.tokens[self.position - 1];
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected: "semicolon".to_string(),
+                        got: TokenKind::Illegal("nothing".to_string()),
+                        line_num: last_token.line,
+                        col_num: last_token.column + 1,
+                    });
+                }
             }
         }
 
@@ -276,6 +317,7 @@ impl Parser {
             type_name,
             name,
             value,
+            else_error,
         })
     }
 

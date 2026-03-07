@@ -64,8 +64,38 @@ impl Interpreter {
         type_name: &str,
         name: &str,
         value: &crate::ast::Expr,
+        else_error: &Option<(String, Vec<crate::ast::Stmt>)>,
     ) -> Result<Value, RuntimeError> {
-        let val = self.evaluate_expression(value)?;
+        let val = match self.evaluate_expression(value) {
+            Ok(v) => v,
+            Err(e) if e.message.starts_with("__raise__") => {
+                let msg = e
+                    .message
+                    .strip_prefix("__raise__")
+                    .unwrap_or("")
+                    .to_string();
+                if let Some((error_var, body)) = else_error {
+                    self.push_scope();
+                    self.declare_variable(error_var, Value::String(msg));
+                    for stmt in body {
+                        self.execute_statement(stmt)?;
+                    }
+                    self.pop_scope();
+                    return Ok(Value::Void);
+                } else {
+                    return Err(RuntimeError {
+                        message: e
+                            .message
+                            .strip_prefix("__raise__")
+                            .unwrap_or(&e.message)
+                            .to_string(),
+                        line: e.line,
+                        column: e.column,
+                    });
+                }
+            }
+            Err(e) => return Err(e),
+        };
 
         let val = match (type_name, val) {
             ("int", Value::Integer(n)) => Value::Integer(n),
