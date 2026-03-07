@@ -41,7 +41,6 @@ pub enum TokenKind {
     FloatLiteral(f64),
     StringLiteral(String),
     CharLiteral(String), // single-quoted literal: 'x' or 'hello'
-    Underscore,
     Plus,
     Minus,
     Star,
@@ -107,7 +106,6 @@ impl fmt::Display for TokenKind {
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
             TokenKind::StringLiteral(s) => write!(f, "\"{}\"", s),
             TokenKind::CharLiteral(s) => write!(f, "'{}'", s),
-            TokenKind::Underscore => write!(f, "_"),
             TokenKind::Plus => write!(f, "+"),
             TokenKind::Minus => write!(f, "-"),
             TokenKind::Star => write!(f, "*"),

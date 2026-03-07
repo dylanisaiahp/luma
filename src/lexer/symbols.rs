@@ -118,10 +118,6 @@ impl Lexer {
                     Err(LexerError::UnexpectedCharacter('|', line, col))
                 }
             }
-            '_' => {
-                self.read_char();
-                Ok(TokenKind::Underscore)
-            }
             '.' => {
                 self.read_char();
                 if self.ch == '.' {
