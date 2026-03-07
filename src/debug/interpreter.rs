@@ -6,7 +6,6 @@ pub struct InterpreterDebug {
     pub events: Vec<DebugEvent>,
 }
 
-#[allow(dead_code)]
 pub enum DebugEvent {
     Call {
         name: String,
@@ -32,6 +31,14 @@ impl InterpreterDebug {
         self.events.push(DebugEvent::Call {
             name: name.to_string(),
             args: args.to_string(),
+            result: format_value(result),
+        });
+    }
+
+    pub fn log_method_call(&mut self, object: &Value, method: &str, result: &Value) {
+        self.events.push(DebugEvent::MethodCall {
+            object: format_value(object),
+            method: method.to_string(),
             result: format_value(result),
         });
     }

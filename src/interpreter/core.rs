@@ -111,7 +111,7 @@ impl Interpreter {
                 self.functions.insert(
                     name.clone(),
                     FunctionDef {
-                        _return_type: return_type.clone(),
+                        return_type: return_type.clone(),
                         params: params.clone(),
                         body: body.clone(),
                     },

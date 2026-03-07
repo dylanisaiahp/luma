@@ -7,14 +7,12 @@ pub struct Expr {
     pub column: usize,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     Integer(i64),
     Float(f64),
     String(String),
-    Char(String), // single character: 'x'
-    Word(String), // single word (no whitespace): 'hello'
+    Char(String), // single-quoted literal: 'x' or 'hello' — coerced to Char/Word at declaration
     Boolean(bool),
     Identifier(String),
     Interpolation(String),
@@ -115,13 +113,11 @@ pub enum Stmt {
         end: Expr,
         body: Vec<Stmt>,
     },
-    // for item in list
     ForIn {
         var: String,
         iterable: Expr,
         body: Vec<Stmt>,
     },
-    // for (key, value) in table
     ForInTable {
         key_var: String,
         val_var: String,

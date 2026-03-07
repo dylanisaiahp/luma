@@ -21,7 +21,7 @@ pub struct VarInfo {
 
 #[derive(Debug, Clone)]
 pub struct FunctionDef {
-    pub _return_type: String,
+    pub return_type: String,
     pub params: Vec<Param>,
     pub body: Vec<Stmt>,
 }

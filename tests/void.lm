@@ -1,7 +1,12 @@
 void main() {
     hello("Dylan");
+    bad();
 }
 
 void hello(string name) {
     print("Hello, &{name}");
+}
+
+void bad() {
+    return 42;
 }

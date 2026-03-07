@@ -12,16 +12,14 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Char(s) => {
-                // CharLiteral parsed as a Char expr — interpret based on content length
-                // The type check in execute_variable_declaration handles char vs word coercion
-                // At expression level, just hand back a Char if single char, else String
+                // Single-quoted literal — single char becomes Char, multi-char becomes String
+                // Type coercion to Word happens at declaration site
                 let mut chars = s.chars();
                 match (chars.next(), chars.next()) {
                     (Some(c), None) => Ok(Value::Char(c)),
-                    _ => Ok(Value::String(s.clone())), // will be validated at declaration site
+                    _ => Ok(Value::String(s.clone())),
                 }
             }
-            ExprKind::Word(s) => Ok(Value::Word(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
             ExprKind::Empty => Ok(Value::Maybe(None)),
             ExprKind::List(items) => {
@@ -182,7 +180,15 @@ impl Interpreter {
                 for arg in args {
                     arg_vals.push(self.evaluate_expression(arg)?);
                 }
-                builtins::eval_method(object_val, method, &arg_vals, expr.line, expr.column)
+                let result = builtins::eval_method(
+                    object_val.clone(),
+                    method,
+                    &arg_vals,
+                    expr.line,
+                    expr.column,
+                )?;
+                self.debug.log_method_call(&object_val, method, &result);
+                Ok(result)
             }
         }
     }

@@ -203,6 +203,18 @@ impl Interpreter {
 
         self.pop_scope();
 
+        // Void enforcement: void functions must not return a value
+        if func.return_type == "void" && return_value != Value::Void {
+            return Err(RuntimeError {
+                message: format!(
+                    "void function '{}' must not return a value — did you mean to declare a return type?",
+                    name
+                ),
+                line,
+                column,
+            });
+        }
+
         let args_str = args
             .iter()
             .map(|_| "…".to_string())
