@@ -34,10 +34,13 @@ pub enum TokenKind {
     Empty,
     List,
     Table,
+    Char,
+    Word,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
     StringLiteral(String),
+    CharLiteral(String), // single-quoted literal: 'x' or 'hello'
     Underscore,
     Plus,
     Minus,
@@ -97,10 +100,13 @@ impl fmt::Display for TokenKind {
             TokenKind::Empty => write!(f, "empty"),
             TokenKind::List => write!(f, "list"),
             TokenKind::Table => write!(f, "table"),
+            TokenKind::Char => write!(f, "char"),
+            TokenKind::Word => write!(f, "word"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
             TokenKind::StringLiteral(s) => write!(f, "\"{}\"", s),
+            TokenKind::CharLiteral(s) => write!(f, "'{}'", s),
             TokenKind::Underscore => write!(f, "_"),
             TokenKind::Plus => write!(f, "+"),
             TokenKind::Minus => write!(f, "-"),
@@ -162,6 +168,8 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Empty => TokenKind::Empty,
             crate::syntax::Keyword::List => TokenKind::List,
             crate::syntax::Keyword::Table => TokenKind::Table,
+            crate::syntax::Keyword::Char => TokenKind::Char,
+            crate::syntax::Keyword::Word => TokenKind::Word,
         }
     }
 }

@@ -35,7 +35,6 @@ impl Interpreter {
     pub fn push_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
-
     pub fn pop_scope(&mut self) {
         self.scopes.pop();
     }
@@ -99,7 +98,6 @@ impl Interpreter {
         }
     }
 
-    // First pass: register all user-defined functions before executing
     fn register_functions(&mut self, statements: &[Stmt]) {
         for stmt in statements {
             if let Stmt::Function {
@@ -108,18 +106,16 @@ impl Interpreter {
                 params,
                 body,
             } = stmt
+                && name != "main"
             {
-                // Don't register main — it's executed directly
-                if name != "main" {
-                    self.functions.insert(
-                        name.clone(),
-                        FunctionDef {
-                            _return_type: return_type.clone(),
-                            params: params.clone(),
-                            body: body.clone(),
-                        },
-                    );
-                }
+                self.functions.insert(
+                    name.clone(),
+                    FunctionDef {
+                        _return_type: return_type.clone(),
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
             }
         }
     }
@@ -130,11 +126,9 @@ impl Interpreter {
         source: &str,
         filename: &str,
     ) -> Result<(), RuntimeError> {
-        // Register all functions before executing
         if let Stmt::Program(stmts) = program {
             self.register_functions(stmts);
         }
-
         self.execute_statement(program)?;
         self.check_unused_variables(source, filename);
         Ok(())
@@ -180,7 +174,6 @@ impl Interpreter {
                     Some(e) => self.evaluate_expression(e)?,
                     None => Value::Void,
                 };
-                // Use a special error variant to unwind the call stack
                 Err(RuntimeError {
                     message: format!("__return__{}", self.encode_return_value(&val)),
                     line: 0,
@@ -229,11 +222,13 @@ impl Interpreter {
             Value::Float(f) => format!("float:{}", f),
             Value::Boolean(b) => format!("bool:{}", b),
             Value::String(s) => format!("string:{}", s),
+            Value::Char(c) => format!("char:{}", c),
+            Value::Word(w) => format!("word:{}", w),
             Value::Void => "void:".to_string(),
             Value::Maybe(Some(inner)) => format!("maybe:{}", self.encode_return_value(inner)),
             Value::Maybe(None) => "maybe:empty".to_string(),
-            Value::List(_) => "list:".to_string(), // TODO: full list encoding
-            Value::Table(_) => "table:".to_string(), // TODO: full table encoding
+            Value::List(_) => "list:".to_string(),
+            Value::Table(_) => "table:".to_string(),
             Value::FetchHandle(url) => format!("fetch:{}", url),
             Value::InputHandle => "input:".to_string(),
             Value::FileHandle(path) => format!("file:{}", path),
@@ -249,6 +244,10 @@ impl Interpreter {
             Value::Boolean(rest == "true")
         } else if let Some(rest) = encoded.strip_prefix("string:") {
             Value::String(rest.to_string())
+        } else if let Some(rest) = encoded.strip_prefix("char:") {
+            Value::Char(rest.chars().next().unwrap_or('\0'))
+        } else if let Some(rest) = encoded.strip_prefix("word:") {
+            Value::Word(rest.to_string())
         } else if encoded == "maybe:empty" {
             Value::Maybe(None)
         } else if let Some(rest) = encoded.strip_prefix("maybe:") {

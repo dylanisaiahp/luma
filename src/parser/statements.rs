@@ -12,7 +12,6 @@ impl Parser {
             Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Break) => {
                 self.advance();
-                // consume optional semicolon
                 if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
                     self.advance();
                 }
@@ -23,6 +22,8 @@ impl Parser {
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
             | Some(TokenKind::String)
+            | Some(TokenKind::Char)
+            | Some(TokenKind::Word)
             | Some(TokenKind::Maybe)
             | Some(TokenKind::List)
             | Some(TokenKind::Table) => self.parse_variable_declaration(),

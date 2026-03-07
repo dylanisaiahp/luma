@@ -65,6 +65,11 @@ impl Lexer {
             return Ok(first_token);
         }
 
+        // Single-quoted char/word literal: 'x' or 'hello'
+        if ch == '\'' {
+            return self.read_char_literal();
+        }
+
         if ch.is_alphabetic() || ch == '_' {
             let literal = self.read_identifier();
             let kind = if let Ok(keyword) = literal.parse::<crate::syntax::Keyword>() {

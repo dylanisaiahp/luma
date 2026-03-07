@@ -53,12 +53,9 @@ impl Parser {
                     TokenKind::LParen => {
                         self.advance(); // consume '('
 
-                        // Empty parens — not valid as a standalone expression
-                        // (empty lists use `empty` keyword)
                         if let Some(t) = self.current_token()
                             && t.kind == TokenKind::RParen
                         {
-                            // () — treat as empty list literal
                             self.advance();
                             return Ok(Expr {
                                 kind: ExprKind::List(Vec::new()),
@@ -67,21 +64,17 @@ impl Parser {
                             });
                         }
 
-                        // Parse first expression
                         let first = self.parse_expression()?;
 
-                        // Check if comma follows — list literal
                         if let Some(t) = self.current_token()
                             && t.kind == TokenKind::Comma
                         {
-                            // It's a list literal: (first, ...)
                             let mut items = vec![first];
                             while let Some(t) = self.current_token() {
                                 if t.kind != TokenKind::Comma {
                                     break;
                                 }
-                                self.advance(); // consume ','
-                                // Allow trailing comma
+                                self.advance();
                                 if let Some(t) = self.current_token()
                                     && t.kind == TokenKind::RParen
                                 {
@@ -97,12 +90,21 @@ impl Parser {
                             });
                         }
 
-                        // No comma — grouping expression
                         self.expect_token(TokenKind::RParen)?;
                         Ok(first)
                     }
                     TokenKind::StringLiteral(_) | TokenKind::Interpolation(_) => {
                         self.parse_string_sequence()
+                    }
+                    // Single-quoted char/word literal — defer type to declaration context,
+                    // parser just produces a CharLiteral expr; interpreter assigns to Char or Word.
+                    TokenKind::CharLiteral(s) => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Char(s),
+                            line,
+                            column: col,
+                        })
                     }
                     TokenKind::Number(n) => {
                         self.advance();
@@ -120,12 +122,19 @@ impl Parser {
                             column: col,
                         })
                     }
-                    TokenKind::Read | TokenKind::Int | TokenKind::Float | TokenKind::String => {
+                    TokenKind::Read
+                    | TokenKind::Int
+                    | TokenKind::Float
+                    | TokenKind::String
+                    | TokenKind::Char
+                    | TokenKind::Word => {
                         let name = match token.kind {
                             TokenKind::Read => "read".to_string(),
                             TokenKind::Int => "int".to_string(),
                             TokenKind::Float => "float".to_string(),
                             TokenKind::String => "string".to_string(),
+                            TokenKind::Char => "char".to_string(),
+                            TokenKind::Word => "word".to_string(),
                             _ => unreachable!(),
                         };
                         self.advance();

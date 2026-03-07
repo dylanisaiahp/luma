@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
 impl Parser {
-    // Helper: parse a simple inner type (int/float/bool/string only)
+    // Helper: parse a simple inner type (int/float/bool/string/char/word)
     fn parse_inner_type(&mut self) -> Option<String> {
         match self.current_token().map(|t| t.kind.clone()) {
             Some(TokenKind::Int) => {
@@ -24,10 +24,18 @@ impl Parser {
                 self.advance();
                 Some("string".to_string())
             }
+            Some(TokenKind::Char) => {
+                self.advance();
+                Some("char".to_string())
+            }
+            Some(TokenKind::Word) => {
+                self.advance();
+                Some("word".to_string())
+            }
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "inner type (int/float/bool/string)".to_string(),
+                    expected: "inner type (int/float/bool/string/char/word)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -55,6 +63,14 @@ impl Parser {
             Some(TokenKind::String) => {
                 self.advance();
                 Some("string".to_string())
+            }
+            Some(TokenKind::Char) => {
+                self.advance();
+                Some("char".to_string())
+            }
+            Some(TokenKind::Word) => {
+                self.advance();
+                Some("word".to_string())
             }
             Some(TokenKind::Maybe) => {
                 self.advance();
@@ -103,7 +119,7 @@ impl Parser {
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "type (int/float/bool/string/maybe/list/table)".to_string(),
+                    expected: "type (int/float/bool/string/char/word/maybe/list/table)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -335,7 +351,6 @@ impl Parser {
             match self.current_token().map(|t| t.kind.clone()) {
                 Some(TokenKind::Comma) => {
                     self.advance();
-                    // Allow trailing comma
                     if let Some(t) = self.current_token()
                         && t.kind == TokenKind::RParen
                     {

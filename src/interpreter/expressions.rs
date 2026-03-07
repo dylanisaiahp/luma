@@ -11,6 +11,17 @@ impl Interpreter {
             ExprKind::Integer(n) => Ok(Value::Integer(*n)),
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
+            ExprKind::Char(s) => {
+                // CharLiteral parsed as a Char expr — interpret based on content length
+                // The type check in execute_variable_declaration handles char vs word coercion
+                // At expression level, just hand back a Char if single char, else String
+                let mut chars = s.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => Ok(Value::Char(c)),
+                    _ => Ok(Value::String(s.clone())), // will be validated at declaration site
+                }
+            }
+            ExprKind::Word(s) => Ok(Value::Word(s.clone())),
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
             ExprKind::Empty => Ok(Value::Maybe(None)),
             ExprKind::List(items) => {

@@ -39,8 +39,6 @@ pub fn eval_input(
     line: usize,
     column: usize,
 ) -> Result<Value, RuntimeError> {
-    // input() with no args returns an InputHandle so .flag() and .option() work
-    // input(n) returns the nth user-provided CLI arg as a string
     if args.is_empty() {
         return Ok(Value::InputHandle);
     }
@@ -57,7 +55,6 @@ pub fn eval_input(
                 });
             }
         };
-        // Skip "luma", "run", "file.lm" — user args start at index 3
         let user_args: Vec<String> = std::env::args().skip(3).collect();
         return Ok(Value::String(
             user_args.get(index).cloned().unwrap_or_default(),
@@ -222,6 +219,195 @@ pub fn eval_write(
     Ok(Value::Void)
 }
 
+// ─── Shared text methods (string, char, word) ────────────────────────────────
+
+fn text_methods(
+    s: &str,
+    method: &str,
+    args: &[Value],
+    line: usize,
+    column: usize,
+) -> Option<Result<Value, RuntimeError>> {
+    match method {
+        "len" => Some(Ok(Value::Integer(s.chars().count() as i64))),
+        "upper" => Some(Ok(Value::String(s.to_uppercase()))),
+        "lower" => Some(Ok(Value::String(s.to_lowercase()))),
+        "trim" => Some(Ok(Value::String(s.trim().to_string()))),
+        "reverse" => Some(Ok(Value::String(s.chars().rev().collect()))),
+        "exists" => Some(Ok(Value::Boolean(!s.is_empty()))),
+        "contains" => Some(match args.first() {
+            Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
+            Some(Value::Char(c)) => Ok(Value::Boolean(s.contains(*c))),
+            Some(Value::Word(w)) => Ok(Value::Boolean(s.contains(w.as_str()))),
+            _ => Err(RuntimeError {
+                message: "contains() takes one string/char/word argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        "starts_with" => Some(match args.first() {
+            Some(Value::String(prefix)) => Ok(Value::Boolean(s.starts_with(prefix.as_str()))),
+            Some(Value::Char(c)) => Ok(Value::Boolean(s.starts_with(*c))),
+            Some(Value::Word(w)) => Ok(Value::Boolean(s.starts_with(w.as_str()))),
+            _ => Err(RuntimeError {
+                message: "starts_with() takes one string/char/word argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        "ends_with" => Some(match args.first() {
+            Some(Value::String(suffix)) => Ok(Value::Boolean(s.ends_with(suffix.as_str()))),
+            Some(Value::Char(c)) => Ok(Value::Boolean(s.ends_with(*c))),
+            Some(Value::Word(w)) => Ok(Value::Boolean(s.ends_with(w.as_str()))),
+            _ => Err(RuntimeError {
+                message: "ends_with() takes one string/char/word argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        "repeat" => Some(match args.first() {
+            Some(Value::Integer(n)) if *n >= 0 => Ok(Value::String(s.repeat(*n as usize))),
+            _ => Err(RuntimeError {
+                message: "repeat() takes one non-negative integer argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        // .replace("old", "new") → string
+        "replace" => Some(match (args.first(), args.get(1)) {
+            (Some(Value::String(from)), Some(Value::String(to))) => {
+                Ok(Value::String(s.replace(from.as_str(), to.as_str())))
+            }
+            _ => Err(RuntimeError {
+                message: "replace() takes two string arguments: replace(from, to)".to_string(),
+                line,
+                column,
+            }),
+        }),
+        // .split(delimiter) → list(string)
+        "split" => Some(match args.first() {
+            Some(Value::String(delim)) => {
+                let parts: Vec<Value> = s
+                    .split(delim.as_str())
+                    .map(|p| Value::String(p.to_string()))
+                    .collect();
+                Ok(Value::List(parts))
+            }
+            Some(Value::Char(c)) => {
+                let parts: Vec<Value> = s.split(*c).map(|p| Value::String(p.to_string())).collect();
+                Ok(Value::List(parts))
+            }
+            None => {
+                // split() with no args splits on whitespace
+                let parts: Vec<Value> = s
+                    .split_whitespace()
+                    .map(|p| Value::String(p.to_string()))
+                    .collect();
+                Ok(Value::List(parts))
+            }
+            _ => Err(RuntimeError {
+                message: "split() takes one string or char argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        // .first("char") / .first("word") → maybe(string)
+        "first" => Some(match args.first() {
+            Some(Value::String(kind)) if kind == "char" => match s.chars().next() {
+                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Maybe(None)),
+            },
+            Some(Value::String(kind)) if kind == "word" => match s.split_whitespace().next() {
+                Some(w) => Ok(Value::Maybe(Some(Box::new(Value::Word(w.to_string()))))),
+                None => Ok(Value::Maybe(None)),
+            },
+            None => {
+                // .first() with no arg defaults to first char
+                match s.chars().next() {
+                    Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
+                    None => Ok(Value::Maybe(None)),
+                }
+            }
+            _ => Err(RuntimeError {
+                message: "string.first() takes 'char' or 'word' as argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        // .last("char") / .last("word") → maybe(string)
+        "last" => Some(match args.first() {
+            Some(Value::String(kind)) if kind == "char" => match s.chars().next_back() {
+                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Maybe(None)),
+            },
+            Some(Value::String(kind)) if kind == "word" => match s.split_whitespace().next_back() {
+                Some(w) => Ok(Value::Maybe(Some(Box::new(Value::Word(w.to_string()))))),
+                None => Ok(Value::Maybe(None)),
+            },
+            None => {
+                // .last() with no arg defaults to last char
+                match s.chars().next_back() {
+                    Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
+                    None => Ok(Value::Maybe(None)),
+                }
+            }
+            _ => Err(RuntimeError {
+                message: "string.last() takes 'char' or 'word' as argument".to_string(),
+                line,
+                column,
+            }),
+        }),
+        // .as(int) / .as(float) / .as(bool) / .as(char) / .as(word) → maybe(T)
+        "as" => Some(match args.first() {
+            Some(Value::String(target)) => match target.as_str() {
+                "int" => match s.trim().parse::<i64>() {
+                    Ok(n) => Ok(Value::Maybe(Some(Box::new(Value::Integer(n))))),
+                    Err(_) => Ok(Value::Maybe(None)),
+                },
+                "float" => match s.trim().parse::<f64>() {
+                    Ok(f) => Ok(Value::Maybe(Some(Box::new(Value::Float(f))))),
+                    Err(_) => Ok(Value::Maybe(None)),
+                },
+                "bool" => match s.trim() {
+                    "true" => Ok(Value::Maybe(Some(Box::new(Value::Boolean(true))))),
+                    "false" => Ok(Value::Maybe(Some(Box::new(Value::Boolean(false))))),
+                    _ => Ok(Value::Maybe(None)),
+                },
+                "char" => {
+                    if s.chars().count() == 1 {
+                        Ok(Value::Maybe(Some(Box::new(Value::Char(
+                            s.chars().next().unwrap(),
+                        )))))
+                    } else {
+                        Ok(Value::Maybe(None))
+                    }
+                }
+                "word" => {
+                    if s.contains(char::is_whitespace) {
+                        Ok(Value::Maybe(None))
+                    } else {
+                        Ok(Value::Maybe(Some(Box::new(Value::Word(s.to_string())))))
+                    }
+                }
+                "string" => Ok(Value::Maybe(Some(Box::new(Value::String(s.to_string()))))),
+                _ => Err(RuntimeError {
+                    message: format!("as() unknown target type '{}'", target),
+                    line,
+                    column,
+                }),
+            },
+            _ => Err(RuntimeError {
+                message:
+                    "as() takes a type argument: as(int), as(float), as(bool), as(char), as(word)"
+                        .to_string(),
+                line,
+                column,
+            }),
+        }),
+        _ => None,
+    }
+}
+
 pub fn eval_method(
     object: Value,
     method: &str,
@@ -230,7 +416,7 @@ pub fn eval_method(
     column: usize,
 ) -> Result<Value, RuntimeError> {
     match (&object, method) {
-        // int methods
+        // ── int methods ───────────────────────────────────────────────────────
         (Value::Integer(n), "abs") => Ok(Value::Integer(n.abs())),
         (Value::Integer(n), "to_float") => Ok(Value::Float(*n as f64)),
         (Value::Integer(n), "to_string") => Ok(Value::String(n.to_string())),
@@ -244,7 +430,7 @@ pub fn eval_method(
             }),
         },
 
-        // float methods
+        // ── float methods ─────────────────────────────────────────────────────
         (Value::Float(f), "abs") => Ok(Value::Float(f.abs())),
         (Value::Float(f), "floor") => Ok(Value::Integer(f.floor() as i64)),
         (Value::Float(f), "ceil") => Ok(Value::Integer(f.ceil() as i64)),
@@ -253,51 +439,57 @@ pub fn eval_method(
         (Value::Float(f), "to_string") => Ok(Value::String(f.to_string())),
         (Value::Float(f), "exists") => Ok(Value::Boolean(*f != 0.0)),
 
-        // string methods
-        (Value::String(s), "len") => Ok(Value::Integer(s.chars().count() as i64)),
-        (Value::String(s), "upper") => Ok(Value::String(s.to_uppercase())),
-        (Value::String(s), "lower") => Ok(Value::String(s.to_lowercase())),
-        (Value::String(s), "trim") => Ok(Value::String(s.trim().to_string())),
-        (Value::String(s), "reverse") => Ok(Value::String(s.chars().rev().collect())),
-        (Value::String(s), "exists") => Ok(Value::Boolean(!s.is_empty())),
-        (Value::String(s), "contains") => match args.first() {
-            Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
-            _ => Err(RuntimeError {
-                message: "string.contains() takes one string argument".to_string(),
-                line,
-                column,
-            }),
-        },
-        (Value::String(s), "starts_with") => match args.first() {
-            Some(Value::String(prefix)) => Ok(Value::Boolean(s.starts_with(prefix.as_str()))),
-            _ => Err(RuntimeError {
-                message: "string.starts_with() takes one string argument".to_string(),
-                line,
-                column,
-            }),
-        },
-        (Value::String(s), "ends_with") => match args.first() {
-            Some(Value::String(suffix)) => Ok(Value::Boolean(s.ends_with(suffix.as_str()))),
-            _ => Err(RuntimeError {
-                message: "string.ends_with() takes one string argument".to_string(),
-                line,
-                column,
-            }),
-        },
-        (Value::String(s), "repeat") => match args.first() {
-            Some(Value::Integer(n)) if *n >= 0 => Ok(Value::String(s.repeat(*n as usize))),
-            _ => Err(RuntimeError {
-                message: "string.repeat() takes one non-negative integer argument".to_string(),
-                line,
-                column,
-            }),
-        },
+        // ── string methods — shared via text_methods ──────────────────────────
+        (Value::String(s), method) => {
+            if let Some(result) = text_methods(s, method, args, line, column) {
+                result
+            } else {
+                Err(RuntimeError {
+                    message: format!("string has no method '{}'", method),
+                    line,
+                    column,
+                })
+            }
+        }
 
-        // bool methods
+        // ── char methods ──────────────────────────────────────────────────────
+        (Value::Char(_), "exists") => Ok(Value::Boolean(true)), // a char always exists
+        (Value::Char(c), "to_string") => Ok(Value::String(c.to_string())),
+        (Value::Char(c), "to_int") => Ok(Value::Integer(*c as i64)),
+        (Value::Char(c), method) => {
+            let s = c.to_string();
+            if let Some(result) = text_methods(&s, method, args, line, column) {
+                result
+            } else {
+                Err(RuntimeError {
+                    message: format!("char has no method '{}'", method),
+                    line,
+                    column,
+                })
+            }
+        }
+
+        // ── word methods ──────────────────────────────────────────────────────
+        (Value::Word(w), "exists") => Ok(Value::Boolean(!w.is_empty())),
+        (Value::Word(w), "to_string") => Ok(Value::String(w.clone())),
+        (Value::Word(w), method) => {
+            let s = w.clone();
+            if let Some(result) = text_methods(&s, method, args, line, column) {
+                result
+            } else {
+                Err(RuntimeError {
+                    message: format!("word has no method '{}'", method),
+                    line,
+                    column,
+                })
+            }
+        }
+
+        // ── bool methods ──────────────────────────────────────────────────────
         (Value::Boolean(b), "to_string") => Ok(Value::String(b.to_string())),
         (Value::Boolean(b), "exists") => Ok(Value::Boolean(*b)),
 
-        // maybe methods
+        // ── maybe methods ─────────────────────────────────────────────────────
         (Value::Maybe(inner), "exists") => Ok(Value::Boolean(inner.is_some())),
         (Value::Maybe(Some(inner)), "or") => Ok(*inner.clone()),
         (Value::Maybe(None), "or") => match args.first() {
@@ -320,7 +512,7 @@ pub fn eval_method(
             column,
         }),
 
-        // list methods
+        // ── list methods ──────────────────────────────────────────────────────
         (Value::List(items), "len") => Ok(Value::Integer(items.len() as i64)),
         (Value::List(items), "exists") => Ok(Value::Boolean(!items.is_empty())),
         (Value::List(items), "get") => match args.first() {
@@ -427,7 +619,7 @@ pub fn eval_method(
             }),
         },
 
-        // table methods
+        // ── table methods ─────────────────────────────────────────────────────
         (Value::Table(pairs), "len") => Ok(Value::Integer(pairs.len() as i64)),
         (Value::Table(pairs), "exists") => Ok(Value::Boolean(!pairs.is_empty())),
         (Value::Table(pairs), "has") => {
@@ -490,7 +682,7 @@ pub fn eval_method(
             Ok(Value::List(vals))
         }
 
-        // fetch handle methods
+        // ── fetch handle methods ───────────────────────────────────────────────
         // TODO: switch to worry(string) once worry() is implemented
         (Value::FetchHandle(url), "get") => match ureq::get(url).call() {
             Ok(mut response) => {
@@ -549,7 +741,7 @@ pub fn eval_method(
             }
         }
 
-        // input handle methods
+        // ── input handle methods ───────────────────────────────────────────────
         (Value::InputHandle, "flag") => match args.first() {
             Some(Value::String(flag_name)) => {
                 let cli_args: Vec<String> = std::env::args().skip(3).collect();
@@ -586,7 +778,7 @@ pub fn eval_method(
             }),
         },
 
-        // file handle methods
+        // ── file handle methods ────────────────────────────────────────────────
         (Value::FileHandle(path), "read") => match std::fs::read_to_string(path) {
             Ok(contents) => Ok(Value::String(contents)),
             Err(e) => Err(RuntimeError {
@@ -601,7 +793,6 @@ pub fn eval_method(
                 Some(v) => v.type_name().to_string(),
                 None => String::new(),
             };
-            // Create parent directories if needed
             if let Some(parent) = std::path::Path::new(path).parent()
                 && !parent.as_os_str().is_empty()
             {
@@ -623,7 +814,6 @@ pub fn eval_method(
                 Some(v) => v.type_name().to_string(),
                 None => String::new(),
             };
-            // Create parent directories if needed
             if let Some(parent) = std::path::Path::new(path).parent()
                 && !parent.as_os_str().is_empty()
             {

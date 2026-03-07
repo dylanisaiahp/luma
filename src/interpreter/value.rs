@@ -4,14 +4,16 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     String(String),
+    Char(char),   // single character: 'x'
+    Word(String), // single whitespace-free token: 'hello'
     Boolean(bool),
     Void,
     Maybe(Option<Box<Value>>),
     List(Vec<Value>),
     Table(Vec<(Value, Value)>),
-    FetchHandle(String), // holds the URL, .get() and .send() called as methods
-    InputHandle, // returned by input() with no args, .flag() and .option() called as methods
-    FileHandle(String), // holds the path, .read()/.write()/.append()/.exists() called as methods
+    FetchHandle(String),
+    InputHandle,
+    FileHandle(String),
 }
 
 #[derive(Debug)]
@@ -27,6 +29,8 @@ impl Value {
             Value::Integer(_) => "int",
             Value::Float(_) => "float",
             Value::String(_) => "string",
+            Value::Char(_) => "char",
+            Value::Word(_) => "word",
             Value::Boolean(_) => "bool",
             Value::Void => "void",
             Value::Maybe(_) => "maybe",

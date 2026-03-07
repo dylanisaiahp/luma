@@ -7,11 +7,14 @@ pub struct Expr {
     pub column: usize,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     Integer(i64),
     Float(f64),
     String(String),
+    Char(String), // single character: 'x'
+    Word(String), // single word (no whitespace): 'hello'
     Boolean(bool),
     Identifier(String),
     Interpolation(String),

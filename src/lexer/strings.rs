@@ -129,6 +129,62 @@ impl Lexer {
         Ok(tokens)
     }
 
+    /// Read a single-quoted literal: 'x' or 'hello'
+    /// No interpolation — used for char and word types.
+    pub fn read_char_literal(&mut self) -> Result<Token, LexerError> {
+        let start_line = self.line;
+        let start_col = self.column;
+        let start_byte = self.byte_pos;
+        self.read_char(); // skip opening '
+
+        let mut content = String::new();
+        while self.ch != '\'' && self.ch != '\0' {
+            if self.ch == '\\' {
+                match self.peek_char() {
+                    'n' => {
+                        content.push('\n');
+                        self.read_char();
+                        self.read_char();
+                    }
+                    't' => {
+                        content.push('\t');
+                        self.read_char();
+                        self.read_char();
+                    }
+                    '\\' => {
+                        content.push('\\');
+                        self.read_char();
+                        self.read_char();
+                    }
+                    '\'' => {
+                        content.push('\'');
+                        self.read_char();
+                        self.read_char();
+                    }
+                    _ => {
+                        content.push('\\');
+                        self.read_char();
+                    }
+                }
+            } else {
+                content.push(self.ch);
+                self.read_char();
+            }
+        }
+
+        if self.ch == '\0' {
+            return Err(LexerError::UnterminatedString(start_line, start_col));
+        }
+
+        self.read_char(); // skip closing '
+        Ok(Token {
+            kind: TokenKind::CharLiteral(content),
+            line: start_line,
+            column: start_col,
+            byte_pos: start_byte,
+        })
+    }
+
     pub fn read_interpolation(&mut self) -> Result<String, LexerError> {
         self.read_char(); // skip '{'
         let position = self.position;

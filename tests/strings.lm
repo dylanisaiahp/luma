@@ -1,0 +1,29 @@
+void main() {
+    # char and word basics
+    char c = 'h';
+    word w = 'hello';
+    print(c);
+    print(w);
+
+    # first and last
+    string text = "hello world";
+    print(text.first(char).or('?'));
+    print(text.last(char).or('?'));
+    print(text.first(word).or('?'));
+    print(text.last(word).or('?'));
+
+    # .as() conversions
+    maybe(int) n = "42".as(int);
+    maybe(float) f = "3.14".as(float);
+    maybe(bool) b = "true".as(bool);
+    maybe(int) bad = "nope".as(int);
+    print(n.or(0));
+    print(f.or(0.0));
+    print(b.or(false));
+    print(bad.or(0));
+
+    # split and replace
+    list(string) parts = text.split(" ");
+    print(parts.len());
+    print(text.replace("world", "Luma"));
+}

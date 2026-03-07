@@ -6,23 +6,21 @@ use crate::interpreter::{Interpreter, VarInfo};
 impl Interpreter {
     pub fn execute_print(&mut self, expr: &crate::ast::Expr) -> Result<Value, RuntimeError> {
         let val = self.evaluate_expression(expr)?;
-
         let output = self.value_to_display_string(&val);
-
         self.debug.log_print(&output);
-
         if self.debug_mode {
             self.output_buffer.push(output);
         } else {
             println!("{}", output);
         }
-
         Ok(Value::Void)
     }
 
     pub fn value_to_display_string(&self, val: &Value) -> String {
         match val {
             Value::String(s) => s.clone(),
+            Value::Char(c) => c.to_string(),
+            Value::Word(w) => w.clone(),
             Value::Integer(n) => n.to_string(),
             Value::Float(f) => {
                 if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && *f != 0.0) {
@@ -74,6 +72,40 @@ impl Interpreter {
             ("float", Value::Float(f)) => Value::Float(f),
             ("bool", Value::Boolean(b)) => Value::Boolean(b),
             ("string", Value::String(s)) => Value::String(s),
+
+            // char — from CharLiteral (Char variant) or single-char string
+            ("char", Value::Char(c)) => Value::Char(c),
+            ("char", Value::String(s)) if s.chars().count() == 1 => {
+                Value::Char(s.chars().next().unwrap())
+            }
+            ("char", Value::String(s)) => {
+                return Err(RuntimeError {
+                    message: format!(
+                        "Type mismatch: expected char (single character), got string of length {}",
+                        s.chars().count()
+                    ),
+                    line: value.line,
+                    column: value.column,
+                });
+            }
+
+            // word — from CharLiteral (Char variant used for word too) or string with no spaces
+            ("word", Value::Char(c)) => Value::Word(c.to_string()),
+            ("word", Value::Word(w)) => Value::Word(w),
+            ("word", Value::String(s)) => {
+                if s.contains(char::is_whitespace) {
+                    return Err(RuntimeError {
+                        message: format!(
+                            "Type mismatch: expected word (no whitespace), got \"{}\"",
+                            s
+                        ),
+                        line: value.line,
+                        column: value.column,
+                    });
+                }
+                Value::Word(s)
+            }
+
             // maybe — auto-wrap non-maybe values
             (t, Value::Maybe(inner)) if t.starts_with("maybe") => Value::Maybe(inner),
             (t, v) if t.starts_with("maybe") => Value::Maybe(Some(Box::new(v))),
@@ -83,6 +115,7 @@ impl Interpreter {
             // table
             (t, Value::Table(pairs)) if t.starts_with("table") => Value::Table(pairs),
             (t, Value::Maybe(None)) if t.starts_with("table") => Value::Table(Vec::new()),
+
             (expected, actual) => {
                 return Err(RuntimeError {
                     message: format!(

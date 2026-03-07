@@ -63,7 +63,7 @@ impl Parser {
                     let dot_token = self.current_token().cloned().unwrap();
                     self.advance(); // consume '.'
 
-                    // Expect method name — keywords are valid method names (e.g. .read(), .write())
+                    // Expect method name — keywords are valid method names
                     let method = match self.current_token().cloned() {
                         Some(t) => {
                             let name = keyword_as_method_name(&t.kind);
@@ -85,7 +85,7 @@ impl Parser {
                         None => return Err(ParseError::UnexpectedEOF),
                     };
 
-                    // Parse optional args
+                    // Parse optional args — special case: .as(type) accepts type keywords
                     let args = if let Some(t) = self.current_token()
                         && t.kind == TokenKind::LParen
                     {
@@ -94,7 +94,29 @@ impl Parser {
                         if let Some(next) = self.current_token()
                             && next.kind != TokenKind::RParen
                         {
-                            args.push(self.parse_expression()?);
+                            // For .as(), .first(), .last() — accept bare type keywords as string args
+                            if method == "as" || method == "first" || method == "last" {
+                                if let Some(type_name) = type_keyword_as_string(
+                                    &self
+                                        .current_token()
+                                        .cloned()
+                                        .map(|t| t.kind)
+                                        .unwrap_or(TokenKind::Eof),
+                                ) {
+                                    let t = self.current_token().cloned().unwrap();
+                                    self.advance();
+                                    args.push(Expr {
+                                        kind: ExprKind::String(type_name),
+                                        line: t.line,
+                                        column: t.column,
+                                    });
+                                } else {
+                                    args.push(self.parse_expression()?);
+                                }
+                            } else {
+                                args.push(self.parse_expression()?);
+                            }
+
                             while let Some(t) = self.current_token().cloned() {
                                 if t.kind == TokenKind::Comma {
                                     self.advance();
@@ -129,7 +151,6 @@ impl Parser {
 }
 
 // Allow keywords to be used as method names after a dot
-// e.g. file("x").read(), file("x").write(), list.contains(), etc.
 fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
     match kind {
         TokenKind::Read => Some("read".to_string()),
@@ -137,8 +158,23 @@ fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
         TokenKind::Int => Some("int".to_string()),
         TokenKind::Float => Some("float".to_string()),
         TokenKind::Bool => Some("bool".to_string()),
+        TokenKind::Char => Some("char".to_string()),
+        TokenKind::Word => Some("word".to_string()),
         TokenKind::In => Some("in".to_string()),
         TokenKind::Not => Some("not".to_string()),
+        _ => None,
+    }
+}
+
+// For .as(int), .first(char), .last(word) — type keywords as string arguments
+fn type_keyword_as_string(kind: &TokenKind) -> Option<String> {
+    match kind {
+        TokenKind::Int => Some("int".to_string()),
+        TokenKind::Float => Some("float".to_string()),
+        TokenKind::Bool => Some("bool".to_string()),
+        TokenKind::String => Some("string".to_string()),
+        TokenKind::Char => Some("char".to_string()),
+        TokenKind::Word => Some("word".to_string()),
         _ => None,
     }
 }
