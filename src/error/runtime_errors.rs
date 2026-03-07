@@ -44,7 +44,7 @@ fn hint_for_runtime(message: &str) -> (&'static str, &'static str) {
             "Conditions must be true or false. Try a comparison like x > 0.",
         )
     } else {
-        ("E011", "Something went wrong at runtime.")
+        ("E016", "Something went wrong at runtime.")
     }
 }
 

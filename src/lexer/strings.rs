@@ -184,25 +184,4 @@ impl Lexer {
             byte_pos: start_byte,
         })
     }
-
-    pub fn read_interpolation(&mut self) -> Result<String, LexerError> {
-        self.read_char(); // skip '{'
-        let position = self.position;
-
-        while self.ch.is_alphabetic() || self.ch == '_' {
-            self.read_char();
-        }
-
-        if self.ch != '}' {
-            return Err(LexerError::UnexpectedCharacter(
-                self.ch,
-                self.line,
-                self.column,
-            ));
-        }
-
-        let ident = self.input[position..self.position].iter().collect();
-        self.read_char(); // skip '}'
-        Ok(ident)
-    }
 }

@@ -109,9 +109,9 @@ impl Parser {
 
                     let pattern = match &expr.kind {
                         ExprKind::Integer(n) => MatchPattern::Integer(*n),
-                        ExprKind::Range { start, end } => {
+                        ExprKind::Call { name, args } if name == "range" && args.len() == 2 => {
                             if let (ExprKind::Integer(s), ExprKind::Integer(e)) =
-                                (&start.kind, &end.kind)
+                                (&args[0].kind, &args[1].kind)
                             {
                                 MatchPattern::Range(*s, *e)
                             } else {

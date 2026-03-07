@@ -144,27 +144,6 @@ impl Interpreter {
                     }
                 }
             },
-            ExprKind::Range { start, end } => {
-                let start_val = self.evaluate_expression(start)?;
-                let end_val = self.evaluate_expression(end)?;
-                match (start_val, end_val) {
-                    (Value::Integer(s), Value::Integer(e)) => {
-                        if s >= e {
-                            return Err(RuntimeError {
-                                message: "range(): start must be less than end".to_string(),
-                                line: expr.line,
-                                column: expr.column,
-                            });
-                        }
-                        Ok(Value::Integer(s))
-                    }
-                    _ => Err(RuntimeError {
-                        message: "range() arguments must be integers".to_string(),
-                        line: expr.line,
-                        column: expr.column,
-                    }),
-                }
-            }
             ExprKind::BinaryOp { left, op, right } => {
                 let left_val = self.evaluate_expression(left)?;
                 let right_val = self.evaluate_expression(right)?;

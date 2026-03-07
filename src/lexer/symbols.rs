@@ -94,7 +94,16 @@ impl Lexer {
                     self.read_char();
                     Ok(TokenKind::And)
                 } else if self.ch == '{' {
-                    let ident = self.read_interpolation()?;
+                    self.read_char(); // skip '{'
+                    let position = self.position;
+                    while self.ch.is_alphabetic() || self.ch == '_' {
+                        self.read_char();
+                    }
+                    if self.ch != '}' {
+                        return Err(LexerError::UnexpectedCharacter(self.ch, line, col));
+                    }
+                    let ident: String = self.input[position..self.position].iter().collect();
+                    self.read_char(); // skip '}'
                     Ok(TokenKind::Interpolation(ident))
                 } else {
                     Err(LexerError::UnexpectedCharacter(self.ch, line, col))

@@ -35,10 +35,6 @@ pub enum ExprKind {
         name: String,
         args: Vec<Expr>,
     },
-    Range {
-        start: Box<Expr>,
-        end: Box<Expr>,
-    },
     MethodCall {
         object: Box<Expr>,
         method: String,

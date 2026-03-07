@@ -32,22 +32,11 @@ impl Parser {
 
                     match expr.kind {
                         ExprKind::Identifier(name) => {
-                            if name == "range" && args.len() == 2 {
-                                expr = Expr {
-                                    kind: ExprKind::Range {
-                                        start: Box::new(args[0].clone()),
-                                        end: Box::new(args[1].clone()),
-                                    },
-                                    line: token.line,
-                                    column: token.column,
-                                };
-                            } else {
-                                expr = Expr {
-                                    kind: ExprKind::Call { name, args },
-                                    line: token.line,
-                                    column: token.column,
-                                };
-                            }
+                            expr = Expr {
+                                kind: ExprKind::Call { name, args },
+                                line: token.line,
+                                column: token.column,
+                            };
                         }
                         _ => {
                             return Err(ParseError::UnexpectedToken {
