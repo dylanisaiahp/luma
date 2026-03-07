@@ -1,0 +1,9 @@
+void main() {
+    file("tests/hello.txt").write("Hello from Luma!");
+    string content = file("tests/hello.txt").read();
+    print(content);
+    print(file("tests/hello.txt").exists());
+    print(file("tests/nope.txt").exists());
+    file("tests/hello.txt").append(" More text!");
+    print(file("tests/hello.txt").read());
+}

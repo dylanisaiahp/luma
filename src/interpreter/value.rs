@@ -11,6 +11,7 @@ pub enum Value {
     Table(Vec<(Value, Value)>),
     FetchHandle(String), // holds the URL, .get() and .send() called as methods
     InputHandle, // returned by input() with no args, .flag() and .option() called as methods
+    FileHandle(String), // holds the path, .read()/.write()/.append()/.exists() called as methods
 }
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ impl Value {
             Value::Table(_) => "table",
             Value::FetchHandle(_) => "fetch",
             Value::InputHandle => "input",
+            Value::FileHandle(_) => "file",
         }
     }
 }

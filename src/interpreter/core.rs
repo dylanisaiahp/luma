@@ -236,6 +236,7 @@ impl Interpreter {
             Value::Table(_) => "table:".to_string(), // TODO: full table encoding
             Value::FetchHandle(url) => format!("fetch:{}", url),
             Value::InputHandle => "input:".to_string(),
+            Value::FileHandle(path) => format!("file:{}", path),
         }
     }
 

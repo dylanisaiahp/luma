@@ -100,5 +100,6 @@ fn format_value(val: &Value) -> String {
         Value::Table(pairs) => format!("Table({})", pairs.len()),
         Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
         Value::InputHandle => "input()".to_string(),
+        Value::FileHandle(path) => format!("file(\"{}\")", path),
     }
 }

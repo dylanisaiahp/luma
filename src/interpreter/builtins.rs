@@ -586,8 +586,99 @@ pub fn eval_method(
             }),
         },
 
+        // file handle methods
+        (Value::FileHandle(path), "read") => match std::fs::read_to_string(path) {
+            Ok(contents) => Ok(Value::String(contents)),
+            Err(e) => Err(RuntimeError {
+                message: format!("file(\"{}\").read() failed: {}", path, e),
+                line,
+                column,
+            }),
+        },
+        (Value::FileHandle(path), "write") => {
+            let content = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                Some(v) => v.type_name().to_string(),
+                None => String::new(),
+            };
+            // Create parent directories if needed
+            if let Some(parent) = std::path::Path::new(path).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            match std::fs::write(path, &content) {
+                Ok(_) => Ok(Value::Void),
+                Err(e) => Err(RuntimeError {
+                    message: format!("file(\"{}\").write() failed: {}", path, e),
+                    line,
+                    column,
+                }),
+            }
+        }
+        (Value::FileHandle(path), "append") => {
+            use std::io::Write;
+            let content = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                Some(v) => v.type_name().to_string(),
+                None => String::new(),
+            };
+            // Create parent directories if needed
+            if let Some(parent) = std::path::Path::new(path).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            match std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+            {
+                Ok(mut f) => match f.write_all(content.as_bytes()) {
+                    Ok(_) => Ok(Value::Void),
+                    Err(e) => Err(RuntimeError {
+                        message: format!("file(\"{}\").append() failed: {}", path, e),
+                        line,
+                        column,
+                    }),
+                },
+                Err(e) => Err(RuntimeError {
+                    message: format!("file(\"{}\").append() failed to open: {}", path, e),
+                    line,
+                    column,
+                }),
+            }
+        }
+        (Value::FileHandle(path), "exists") => {
+            Ok(Value::Boolean(std::path::Path::new(path).exists()))
+        }
+
         _ => Err(RuntimeError {
             message: format!("'{}' has no method '{}'", object.type_name(), method),
+            line,
+            column,
+        }),
+    }
+}
+
+pub fn eval_file(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "file() takes exactly one argument (path)".to_string(),
+            line,
+            column,
+        });
+    }
+    let path_val = interpreter.evaluate_expression(&args[0])?;
+    match path_val {
+        Value::String(path) => Ok(Value::FileHandle(path)),
+        _ => Err(RuntimeError {
+            message: "file() argument must be a string path".to_string(),
             line,
             column,
         }),

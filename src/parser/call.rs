@@ -63,14 +63,17 @@ impl Parser {
                     let dot_token = self.current_token().cloned().unwrap();
                     self.advance(); // consume '.'
 
-                    // Expect method name
+                    // Expect method name — keywords are valid method names (e.g. .read(), .write())
                     let method = match self.current_token().cloned() {
-                        Some(t) => match t.kind {
-                            TokenKind::Identifier(name) => {
+                        Some(t) => {
+                            let name = keyword_as_method_name(&t.kind);
+                            if let Some(name) = name {
                                 self.advance();
                                 name
-                            }
-                            _ => {
+                            } else if let TokenKind::Identifier(name) = t.kind {
+                                self.advance();
+                                name
+                            } else {
                                 return Err(ParseError::UnexpectedToken {
                                     expected: "method name".to_string(),
                                     got: t.kind,
@@ -78,7 +81,7 @@ impl Parser {
                                     col_num: t.column,
                                 });
                             }
-                        },
+                        }
                         None => return Err(ParseError::UnexpectedEOF),
                     };
 
@@ -122,5 +125,20 @@ impl Parser {
         }
 
         Ok(expr)
+    }
+}
+
+// Allow keywords to be used as method names after a dot
+// e.g. file("x").read(), file("x").write(), list.contains(), etc.
+fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
+    match kind {
+        TokenKind::Read => Some("read".to_string()),
+        TokenKind::String => Some("string".to_string()),
+        TokenKind::Int => Some("int".to_string()),
+        TokenKind::Float => Some("float".to_string()),
+        TokenKind::Bool => Some("bool".to_string()),
+        TokenKind::In => Some("in".to_string()),
+        TokenKind::Not => Some("not".to_string()),
+        _ => None,
     }
 }

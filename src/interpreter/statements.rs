@@ -57,6 +57,7 @@ impl Interpreter {
             }
             Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
             Value::InputHandle => "input()".to_string(),
+            Value::FileHandle(path) => format!("file(\"{}\")", path),
         }
     }
 
