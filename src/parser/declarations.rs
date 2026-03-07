@@ -196,39 +196,7 @@ impl Parser {
             return None;
         }
 
-        if let Err(e) = self.expect_token(TokenKind::LBrace) {
-            self.errors.push(e);
-            return None;
-        }
-
-        let mut body = Vec::new();
-        let mut last_body_pos = 0;
-        while let Some(token) = self.current_token() {
-            if self.position == last_body_pos {
-                self.advance();
-                last_body_pos = self.position;
-                continue;
-            }
-            last_body_pos = self.position;
-
-            match token.kind {
-                TokenKind::RBrace => {
-                    self.advance();
-                    break;
-                }
-                TokenKind::Eof => {
-                    self.errors.push(ParseError::UnexpectedEOF);
-                    break;
-                }
-                _ => {
-                    if let Some(stmt) = self.parse_statement() {
-                        body.push(stmt);
-                    } else {
-                        self.advance();
-                    }
-                }
-            }
-        }
+        let body = self.parse_block()?;
 
         Some(Stmt::Function {
             return_type,

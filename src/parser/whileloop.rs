@@ -2,7 +2,6 @@
 use super::Parser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use crate::parser::error::ParseError;
 
 impl Parser {
     pub fn parse_while_statement(&mut self) -> Option<Stmt> {
@@ -23,41 +22,7 @@ impl Parser {
             }
         };
 
-        if let Err(e) = self.expect_token(TokenKind::LBrace) {
-            self.errors.push(e);
-            self.position = start_pos;
-            self.synchronize();
-            return None;
-        }
-
-        let mut body = Vec::new();
-        let mut last_pos = 0;
-        while let Some(token) = self.current_token() {
-            if self.position == last_pos {
-                self.advance();
-                last_pos = self.position;
-                continue;
-            }
-            last_pos = self.position;
-
-            match token.kind {
-                TokenKind::RBrace => {
-                    self.advance();
-                    break;
-                }
-                TokenKind::Eof => {
-                    self.errors.push(ParseError::UnexpectedEOF);
-                    break;
-                }
-                _ => {
-                    if let Some(stmt) = self.parse_statement() {
-                        body.push(stmt);
-                    } else {
-                        self.advance();
-                    }
-                }
-            }
-        }
+        let body = self.parse_block()?;
 
         Some(Stmt::While { condition, body })
     }
