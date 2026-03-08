@@ -16,6 +16,10 @@ pub struct Interpreter {
     pub debug: InterpreterDebug,
     pub output_buffer: Vec<String>,
     pub debug_mode: bool,
+    /// Holds a List or Table value being returned from a function.
+    /// The encode/decode string protocol can't round-trip complex values,
+    /// so we stash them here and use the sentinel "__return_slot__" instead.
+    pub return_slot: Option<Value>,
 }
 
 impl Interpreter {
@@ -29,6 +33,7 @@ impl Interpreter {
             debug: InterpreterDebug::new(),
             output_buffer: Vec::new(),
             debug_mode: false,
+            return_slot: None,
         }
     }
 
@@ -175,8 +180,9 @@ impl Interpreter {
                     Some(e) => self.evaluate_expression(e)?,
                     None => Value::Void,
                 };
+                let encoded = self.encode_return_value(&val);
                 Err(RuntimeError {
-                    message: format!("__return__{}", self.encode_return_value(&val)),
+                    message: format!("__return__{}", encoded),
                     line: 0,
                     column: 0,
                 })
@@ -232,7 +238,10 @@ impl Interpreter {
         }
     }
 
-    pub fn encode_return_value(&self, val: &Value) -> String {
+    /// Encode a return value as a string sentinel for the error-propagation
+    /// return mechanism. List and Table values cannot be serialized safely,
+    /// so they are stashed in `self.return_slot` and a sentinel is returned.
+    pub fn encode_return_value(&mut self, val: &Value) -> String {
         match val {
             Value::Integer(n) => format!("int:{}", n),
             Value::Float(f) => format!("float:{}", f),
@@ -241,10 +250,17 @@ impl Interpreter {
             Value::Char(c) => format!("char:{}", c),
             Value::Word(w) => format!("word:{}", w),
             Value::Void => "void:".to_string(),
-            Value::Maybe(Some(inner)) => format!("maybe:{}", self.encode_return_value(inner)),
+            Value::Maybe(Some(inner)) => {
+                let inner_encoded = self.encode_return_value(inner);
+                format!("maybe:{}", inner_encoded)
+            }
             Value::Maybe(None) => "maybe:empty".to_string(),
-            Value::List(_) => "list:".to_string(),
-            Value::Table(_) => "table:".to_string(),
+            // List and Table cannot be round-tripped through a string.
+            // Stash the value in the slot and use a sentinel instead.
+            Value::List(_) | Value::Table(_) => {
+                self.return_slot = Some(val.clone());
+                "__return_slot__".to_string()
+            }
             Value::FetchHandle(url) => format!("fetch:{}", url),
             Value::InputHandle => "input:".to_string(),
             Value::FileHandle(path) => format!("file:{}", path),

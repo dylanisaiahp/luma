@@ -85,18 +85,30 @@ impl Parser {
     }
 
     pub fn parse_return_statement(&mut self) -> Option<Stmt> {
-        self.advance();
+        self.advance(); // consume 'return'
 
         if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
             self.advance();
             return Some(Stmt::Return(None));
         }
 
-        let expr = match self.parse_expression() {
-            Ok(e) => e,
-            Err(e) => {
-                self.errors.push(e);
-                return None;
+        // If the return value looks like a table literal `("key": val, ...)`,
+        // use parse_table_literal so the colon tokens are handled correctly.
+        let expr = if self.looks_like_table_literal() {
+            match self.parse_table_literal() {
+                Ok(e) => e,
+                Err(e) => {
+                    self.errors.push(e);
+                    return None;
+                }
+            }
+        } else {
+            match self.parse_expression() {
+                Ok(e) => e,
+                Err(e) => {
+                    self.errors.push(e);
+                    return None;
+                }
             }
         };
 

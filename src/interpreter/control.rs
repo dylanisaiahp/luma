@@ -179,6 +179,9 @@ impl Interpreter {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
+        // Clear any stale slot from a previous call before executing the body.
+        self.return_slot = None;
+
         self.push_scope();
 
         for (param, val) in func.params.iter().zip(arg_values) {
@@ -191,11 +194,18 @@ impl Interpreter {
                 Ok(_) => {}
                 Err(e) if e.message.starts_with("__return__") => {
                     let encoded = e.message.strip_prefix("__return__").unwrap_or("");
-                    return_value = Interpreter::decode_return_value(encoded);
+                    return_value = if encoded == "__return_slot__" {
+                        // A List or Table was stashed in the slot by encode_return_value.
+                        self.return_slot.take().unwrap_or(Value::Void)
+                    } else {
+                        Interpreter::decode_return_value(encoded)
+                    };
                     break;
                 }
                 Err(e) => {
                     self.pop_scope();
+                    // Clear the slot on error paths so stale data never leaks.
+                    self.return_slot = None;
                     return Err(e);
                 }
             }

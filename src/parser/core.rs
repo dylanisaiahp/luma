@@ -132,8 +132,9 @@ impl Parser {
             last_position = self.position;
 
             // Check for maybe(type) function_name() pattern
+            // Tokens: maybe ( type ) identifier (
+            //           +0   +1  +2  +3    +4    +5
             let is_maybe_function = if token.kind == TokenKind::Maybe {
-                // look for: maybe ( type ) identifier (
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
                     && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
@@ -147,6 +148,31 @@ impl Parser {
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
                     && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
                     && matches!(self.tokens.get(self.position + 5), Some(t) if t.kind == TokenKind::LParen)
+            } else {
+                false
+            };
+
+            // Check for list(type) function_name() pattern
+            // Tokens: list ( type ) identifier (
+            //          +0   +1  +2  +3    +4    +5
+            let is_list_function = if token.kind == TokenKind::List {
+                matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
+                    && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
+                    && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
+                    && matches!(self.tokens.get(self.position + 5), Some(t) if t.kind == TokenKind::LParen)
+            } else {
+                false
+            };
+
+            // Check for table(key, val) function_name() pattern
+            // Tokens: table ( key , val ) identifier (
+            //           +0   +1  +2  +3  +4  +5   +6    +7
+            let is_table_function = if token.kind == TokenKind::Table {
+                matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
+                    && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::Comma)
+                    && matches!(self.tokens.get(self.position + 5), Some(t) if t.kind == TokenKind::RParen)
+                    && matches!(self.tokens.get(self.position + 6), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
+                    && matches!(self.tokens.get(self.position + 7), Some(t) if t.kind == TokenKind::LParen)
             } else {
                 false
             };
@@ -207,8 +233,8 @@ impl Parser {
                     }
                 }
                 TokenKind::Worry if is_worry_function => {
-                    // maybe(int) function_name() { ... }
-                    self.advance(); // consume 'maybe'
+                    // worry(int) function_name() { ... }
+                    self.advance(); // consume 'worry'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
                         continue;
@@ -221,7 +247,7 @@ impl Parser {
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
-                                expected: "type inside maybe()".to_string(),
+                                expected: "type inside worry()".to_string(),
                                 got: token.kind,
                                 line_num: token.line,
                                 col_num: token.column,
@@ -235,6 +261,99 @@ impl Parser {
                         continue;
                     }
                     let return_type = format!("worry({})", inner);
+                    if let Some(func) = self.parse_function(return_type) {
+                        statements.push(func);
+                    }
+                }
+                TokenKind::List if is_list_function => {
+                    // list(int) function_name() { ... }
+                    self.advance(); // consume 'list'
+                    if let Err(e) = self.expect_token(TokenKind::LParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let inner = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Word) => "word".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "type inside list()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    self.advance(); // consume inner type
+                    if let Err(e) = self.expect_token(TokenKind::RParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let return_type = format!("list({})", inner);
+                    if let Some(func) = self.parse_function(return_type) {
+                        statements.push(func);
+                    }
+                }
+                TokenKind::Table if is_table_function => {
+                    // table(string, int) function_name() { ... }
+                    self.advance(); // consume 'table'
+                    if let Err(e) = self.expect_token(TokenKind::LParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let key_type = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Word) => "word".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "key type inside table()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    self.advance(); // consume key type
+                    if let Err(e) = self.expect_token(TokenKind::Comma) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let val_type = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Int) => "int".to_string(),
+                        Some(TokenKind::Float) => "float".to_string(),
+                        Some(TokenKind::Bool) => "bool".to_string(),
+                        Some(TokenKind::String) => "string".to_string(),
+                        Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Word) => "word".to_string(),
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "value type inside table()".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    self.advance(); // consume val type
+                    if let Err(e) = self.expect_token(TokenKind::RParen) {
+                        self.errors.push(e);
+                        continue;
+                    }
+                    let return_type = format!("table({}, {})", key_type, val_type);
                     if let Some(func) = self.parse_function(return_type) {
                         statements.push(func);
                     }

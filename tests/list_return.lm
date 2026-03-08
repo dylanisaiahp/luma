@@ -1,0 +1,63 @@
+# tests/list_return.lm
+# Verifies that list(T) and table(K,V) round-trip correctly through function returns.
+
+list(int) make_nums() {
+    return (10, 20, 30);
+}
+
+list(string) make_words() {
+    return ("hello", "luma", "world");
+}
+
+table(string, int) make_scores() {
+    return ("Alice": 95, "Bob": 87, "Carol": 92);
+}
+
+list(int) double_list(list(int) nums) {
+    list(int) result = ();
+    for n in nums {
+        result = result.add(n * 2);
+    }
+    return result;
+}
+
+void main() {
+    # Basic list return
+    list(int) nums = make_nums();
+    print(nums.len());       # 3
+    print(nums.get(0));      # 10
+    print(nums.get(2));      # 30
+
+    # String list return
+    list(string) words = make_words();
+    print(words.len());      # 3
+    print(words.get(1));     # luma
+
+    # Table return
+    table(string, int) scores = make_scores();
+    print(scores.len());     # 3
+    print(scores.get("Alice"));   # 95
+    print(scores.get("Carol"));   # 92
+    print(scores.has("Bob"));     # true
+    print(scores.has("Dylan"));   # false
+
+    # List passed in and returned back out
+    list(int) doubled = double_list(nums);
+    print(doubled.len());    # 3
+    print(doubled.get(0));   # 20
+    print(doubled.get(1));   # 40
+    print(doubled.get(2));   # 60
+
+    # Iterate over returned list
+    for item in nums {
+        print(item);         # 10, 20, 30
+    }
+
+    # Iterate over returned table
+    for (name, score) in scores {
+        print(name);
+        print(score);
+    }
+
+    print("all list/table return tests passed!");
+}

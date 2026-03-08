@@ -142,6 +142,52 @@ impl Parser {
         }
     }
 
+    /// Peek ahead from the current position to decide if this looks like a
+    /// table literal `("key": value, ...)` vs a function call `foo()` or
+    /// a list literal `(1, 2, 3)`.
+    ///
+    /// Rules:
+    /// - If current token is NOT `(`, it's not a table literal.
+    /// - If current token is `(` followed immediately by `)`, it's an empty
+    ///   literal — treat as table literal only if the declaration type is table.
+    /// - If current token is `(` and we find a `:` before the matching `)`,
+    ///   it's a table literal.
+    /// - Otherwise (no `:` found), it's a list literal or function call.
+    pub fn looks_like_table_literal(&self) -> bool {
+        // Must start with `(`
+        if !matches!(
+            self.tokens.get(self.position).map(|t| &t.kind),
+            Some(TokenKind::LParen)
+        ) {
+            return false;
+        }
+
+        // Scan ahead counting paren depth until we find a `:` or close the
+        // outer `(`. We don't want to cross into nested function calls.
+        let mut depth = 0;
+        let mut i = self.position;
+        while i < self.tokens.len() {
+            match &self.tokens[i].kind {
+                TokenKind::LParen => depth += 1,
+                TokenKind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        // Closed without finding `:` at depth 1 — not a table literal.
+                        return false;
+                    }
+                }
+                TokenKind::Colon if depth == 1 => {
+                    // Found a `:` at the top level of the parens — table literal.
+                    return true;
+                }
+                TokenKind::Eof | TokenKind::Semicolon => break,
+                _ => {}
+            }
+            i += 1;
+        }
+        false
+    }
+
     pub fn parse_function(&mut self, return_type: String) -> Option<Stmt> {
         let name = match self.current_token().map(|t| &t.kind) {
             Some(TokenKind::Identifier(name)) => {
@@ -249,8 +295,13 @@ impl Parser {
             return None;
         }
 
-        // Table literals need special parsing: ("key": value, ...)
-        let value = if type_name.starts_with("table") {
+        // For table-typed variables, we need to decide whether the RHS is:
+        //   a) a table literal: ("key": val, ...)  → use parse_table_literal
+        //   b) a function call or expression: foo() → use parse_expression
+        //
+        // We use looks_like_table_literal() to distinguish. For non-table
+        // types (list, etc.) we always use parse_expression.
+        let value = if type_name.starts_with("table") && self.looks_like_table_literal() {
             match self.parse_table_literal() {
                 Ok(expr) => expr,
                 Err(e) => {
