@@ -1,100 +1,20 @@
-# Luma 🌙
+# Luma
 
-A small programming language designed to be **kind** — explicit, predictable, and gentle on the brain.
+A small, statically-typed programming language with clear syntax and kind error messages.
 
-Luma was built for people who want to focus on *what* they're building, not fight their tools. Every design decision prioritizes clarity over cleverness.
-
----
-
-## Philosophy
-
-- **No hidden magic** — everything is visible and explicit
-- **Predictable behavior** — what you see is what you get
-- **Kind errors** that explain *how* to fix problems, not just *that* something broke
-- **Low cognitive load** — consistent patterns, minimal punctuation noise
-- **Multiple errors at once** — never stop at the first problem and leave you guessing
-
----
-
-## What It Looks Like
 ```luma
 void main() {
-    int x = 5;
-    string name = "Luma";
-
-    if x > 3 {
-        print("x is greater than 3");
-    }
-
-    for i in range(1, 4) {
-        write("&{i}... ");
-    }
-
-    while x > 0 {
-        print("&{x} remaining");
-        x -= 1;
-    }
-
-    print("Hello, &{name}!");
+    print("Hello, Luma!");
 }
 ```
 
 ---
 
-## Key Features
+## Why Luma?
 
-- **Explicit types** — `int x = 5;`, `string name = "Luma";`, `bool done = false;`
-- **No sigils** — just clear, readable keywords
-- **String interpolation** — `"Hello, &{name}!"` just works
-- **For loops** — `for i in range(1, 10) { ... }`
-- **Match statements** with integer, range, and wildcard patterns
-- **User-defined functions** with typed parameters and return values
-- **Logical operators** — `&&`, `||`, and `not`
-- **Compound assignments** — `+=`, `-=`, `*=`, `/=`
-- **Remainder operator** — `x % y`
-- **Negative literals** — `-42`, `-3.14`
-- **Proper block scoping** — variables don't leak outside their block
-- **Kind error messages** — source snippets, pointers, fix suggestions, and common-mistake hints
-- **Warnings** for unused variables with actionable hints
-- **Debug levels** — `--debug basic`, `--debug verbose`, `--debug trace`
-- **Fast** — runs simple programs in ~200 microseconds
+Luma was built by someone who struggles to write code independently due to disabilities affecting reading, mathematics, focus, and cognitive load. Working with AI tools made building a language possible — but it also made clear how important *predictable, explicit* design is.
 
----
-
-## Error Messages
-
-Luma's errors are designed to be friendly, not terse:
-```
-[E001] Error: Missing semicolon
-   ╭─[ main.lm:3:14 ]
-   │
- 3 │     int x = 5
-   │              │
-   │              ╰─ Suggestion: Add a semicolon at the end of this statement.
-───╯
-```
-
-Luma also recognizes common mistakes from other languages:
-```
-[E002] Error: I don't know what 'println' means here
-   ╭─[ main.lm:2:5 ]
-   │
- 2 │     println("hello");
-   │     │
-   │     ╰─ Luma uses print() — it already adds a newline automatically.
-───╯
-```
-
-Warnings use `[?]` instead of `[!]` so they feel less alarming:
-```
-[?] Warning: Unused variable: 'x'
-   ╭─[ main.lm:2:9 ]
-   │
- 2 │     int x = 5;
-   │         │
-   │         ╰─ If you meant to ignore it, prefix with underscore: _x
-───╯
-```
+Luma is for anyone who finds programming languages overwhelming. It won't surprise you. It won't judge you. It'll tell you exactly what went wrong and how to fix it.
 
 ---
 
@@ -104,7 +24,16 @@ Warnings use `[?]` instead of `[!]` so they feel less alarming:
 
 An interactive install script is coming soon. Watch this repo for updates.
 
+For now, clone and build with Cargo:
+
+```bash
+git clone https://github.com/dylanisaiahp/luma
+cd luma
+cargo build --release
+```
+
 ### Usage
+
 ```bash
 # Run a Luma file
 luma run main.lm
@@ -119,14 +48,14 @@ luma new myproject
 luma run main.lm --time
 
 # Enable debug output
-luma run main.lm --debug basic
-luma run main.lm --debug verbose
-luma run main.lm --debug trace
+luma run main.lm --debug lexer
+luma run main.lm --debug parser
+luma run main.lm --debug interpreter
+luma run main.lm --debug all:verbose
 ```
 
 ### Project Structure
 
-A Luma project looks like this:
 ```
 myproject/
 ├── lm/
@@ -146,8 +75,14 @@ myproject/
 | `float` | `float pi = 3.14;` |
 | `string` | `string name = "Luma";` |
 | `bool` | `bool done = false;` |
+| `char` | `char c = 'a';` |
+| `word` | `word tag = 'hello';` |
+| `maybe(T)` | `maybe(int) val = empty;` |
+| `list(T)` | `list(int) nums = (1, 2, 3);` |
+| `table(K, V)` | `table(string, int) scores = ("Alice": 95);` |
 
 ### Functions
+
 ```luma
 # Void function — no return value
 void greet(string name) {
@@ -159,6 +94,15 @@ int add(int x, int y) {
     return x + y;
 }
 
+# Functions can return lists and tables
+list(int) range_list(int n) {
+    list(int) result = ();
+    for i in range(0, n) {
+        result = result.add(i);
+    }
+    return result;
+}
+
 void main() {
     greet("world");
     int result = add(3, 4);
@@ -167,6 +111,7 @@ void main() {
 ```
 
 ### Control Flow
+
 ```luma
 # If / else if / else
 if x > 10 {
@@ -182,19 +127,30 @@ while x > 0 {
     x -= 1;
 }
 
-# For loop
+# For loop with range
 for i in range(1, 6) {
     print(i);
 }
 
-# Break out of a loop
+# For loop over a list
+for item in my_list {
+    print(item);
+}
+
+# For loop over a table
+for (key, value) in my_table {
+    print(key);
+    print(value);
+}
+
+# Break
 while true {
     if done {
         break;
     }
 }
 
-# Match statement
+# Match
 match x {
     1:
         print("one");
@@ -205,7 +161,67 @@ match x {
 }
 ```
 
+### Error Handling
+
+```luma
+# worry(T) — a value that might fail
+worry(int) safe_divide(int a, int b) {
+    if b == 0 {
+        raise "cannot divide by zero";
+    }
+    return a / b;
+}
+
+void main() {
+    # Handle the error with else error
+    int result = safe_divide(10, 0) else err {
+        print(err);
+        return;
+    };
+    print(result);
+}
+```
+
+### Collections
+
+```luma
+# Lists
+list(int) nums = (1, 2, 3, 4, 5);
+print(nums.len());         # 5
+print(nums.get(0));        # 1
+print(nums.contains(3));   # true
+list(int) sorted = nums.reverse();
+
+# Tables
+table(string, int) scores = ("Alice": 95, "Bob": 87);
+print(scores.len());           # 2
+print(scores.get("Alice"));    # 95
+print(scores.has("Bob"));      # true
+scores = scores.set("Carol", 92);
+```
+
+### Maybe
+
+```luma
+maybe(string) find_name(bool exists) {
+    if exists {
+        return "Dylan";
+    }
+    return empty;
+}
+
+void main() {
+    maybe(string) name = find_name(true);
+    print(name.exists());        # true
+    print(name.or("Guest"));     # Dylan
+
+    maybe(string) missing = find_name(false);
+    print(missing.or("Guest"));  # Guest
+}
+```
+
 ### Operators
+
 ```luma
 # Arithmetic
 x + y    x - y    x * y    x / y    x % y
@@ -218,80 +234,83 @@ x && y   x || y   not x
 
 # Compound assignment
 x += 1   x -= 1   x *= 2   x /= 2
-
-# Negative literals
-int n = -42;
-float f = -3.14;
 ```
 
 ### Built-in Functions
 
 | Function | Description |
 |----------|-------------|
-| `print(value)` | Print a value followed by a newline |
+| `print(value)` | Print a value with a newline |
 | `write(value)` | Print a value without a newline |
 | `read()` | Read a line from stdin |
+| `input(n)` | Read the nth CLI argument |
 | `int(value)` | Convert to integer |
 | `float(value)` | Convert to float |
 | `string(value)` | Convert to string |
 | `random(min, max)` | Random integer between min and max (inclusive) |
+| `fetch(url)` | Make an HTTP GET request |
+| `file(path)` | Open a file handle |
+
+### String Methods
+
+```luma
+string s = "hello world";
+print(s.upper());          # HELLO WORLD
+print(s.len());            # 11
+print(s.contains("world")); # true
+print(s.split(" "));       # list of words
+```
 
 ### String Interpolation
+
 ```luma
 string name = "world";
 int count = 42;
 print("Hello, &{name}! Count is &{count}.");
 ```
 
-### Imports (stub)
+### File I/O
+
 ```luma
-use math;
+file("data.txt").write("Hello!");
+string content = file("data.txt").read();
+bool exists = file("data.txt").exists();
+file("data.txt").append(" More text!");
 ```
-Full import system and standard library coming soon.
 
 ---
 
-## Current State
+## Error Messages
 
-Luma is in **active early development**. It works, but some features are still being built.
+Luma tries to tell you exactly what went wrong and how to fix it:
 
-### Working
-- ✅ Lexer, parser, AST, interpreter
-- ✅ All four primitive types (`int`, `float`, `string`, `bool`)
-- ✅ Variable declarations with type checking
-- ✅ Proper block scoping
-- ✅ If / else if / else
-- ✅ While loops
-- ✅ For loops with `range()`
-- ✅ Break statement
-- ✅ Match statements with integer, range, and wildcard patterns
-- ✅ User-defined functions with typed params and return values
-- ✅ String interpolation
-- ✅ Compound assignments (`+=`, `-=`, `*=`, `/=`)
-- ✅ Remainder operator (`%`)
-- ✅ Negative number literals
-- ✅ Logical operators (`&&`, `||`, `not`)
-- ✅ String equality and comparison
-- ✅ Built-in functions (`print`, `write`, `read`, `int`, `float`, `string`, `random`)
-- ✅ Kind error and warning system with common-mistake hints
-- ✅ `use` keyword (stub — imports coming soon)
-- ✅ CLI (`run`, `check`, `new`, `--time`, `--debug`)
+```
+[E010] Error: Type mismatch: expected int, got string
+   ╭─[ main.lm:3:15 ]
+   │
+ 3 │     int x = "hello";
+   │             ───────
+   │                ╰── Make sure the value type matches the variable declaration.
+───╯
+```
 
-### Coming Soon
-- 🔲 Method chaining (`.`)
-- 🔲 Extension methods (`int.squared()`, `string.shout()`)
-- 🔲 `maybe()` type with `.or()` for optional values
-- 🔲 New types (`char`, `list`, `table`)
-- 🔲 Standard library (`math`, `io`, etc.)
-- 🔲 Import system + `luma.toml`
+Warnings are less alarming on purpose:
+
+```
+[?] Warning: Unused variable: 'x'
+   ╭─[ main.lm:2:9 ]
+   │
+ 2 │     int x = 5;
+   │         │
+   │         ╰─ If you meant to ignore it, prefix with underscore: _x
+───╯
+```
 
 ---
 
-## Why Luma?
+## Roadmap
 
-Luma was built by someone who struggles to write code independently due to disabilities affecting reading, mathematics, focus, and cognitive load. Working with AI tools made building a language possible — but it also made clear how important *predictable, explicit* design is.
-
-Luma is for anyone who finds programming languages overwhelming. It won't surprise you. It won't judge you. It'll tell you exactly what went wrong and how to fix it.
+See [ROADMAP.md](ROADMAP.md) for what's done and what's coming.
 
 ---
 
