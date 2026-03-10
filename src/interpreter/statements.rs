@@ -32,7 +32,7 @@ impl Interpreter {
             Value::Boolean(b) => b.to_string(),
             Value::Void => String::new(),
             Value::Maybe(Some(inner)) => self.value_to_display_string(inner),
-            Value::Maybe(None) => "empty".to_string(),
+            Value::Maybe(None) => String::new(),
             Value::List(items) => {
                 let parts: Vec<String> = items
                     .iter()

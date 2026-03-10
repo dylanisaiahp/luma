@@ -122,6 +122,30 @@ impl Parser {
                             column: col,
                         })
                     }
+                    TokenKind::True => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Boolean(true),
+                            line,
+                            column: col,
+                        })
+                    }
+                    TokenKind::False => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Boolean(false),
+                            line,
+                            column: col,
+                        })
+                    }
+                    TokenKind::Empty => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::Empty,
+                            line,
+                            column: col,
+                        })
+                    }
                     TokenKind::Read
                     | TokenKind::Int
                     | TokenKind::Float
@@ -147,22 +171,38 @@ impl Parser {
                             && (ident == "max" || ident == "min")
                         {
                             self.advance(); // consume '.'
-                            let constant = match self.current_token() {
-                                Some(t) => {
-                                    if let TokenKind::Identifier(ref s) = t.kind {
-                                        s.clone()
-                                    } else {
-                                        unreachable!()
-                                    }
-                                }
-                                None => unreachable!(),
+                            let ident = match &self.tokens[self.position].kind {
+                                TokenKind::Identifier(s) => s.clone(),
+                                _ => unreachable!(),
                             };
-                            self.advance();
+                            self.advance(); // consume 'max'/'min'
                             return Ok(Expr {
                                 kind: ExprKind::TypeConstant {
                                     type_name: name,
-                                    constant,
+                                    constant: ident,
                                 },
+                                line,
+                                column: col,
+                            });
+                        }
+
+                        if self.current_token().map(|t| &t.kind) == Some(&TokenKind::LParen) {
+                            self.advance(); // consume '('
+                            let mut args = Vec::new();
+                            while let Some(t) = self.current_token() {
+                                if t.kind == TokenKind::RParen {
+                                    break;
+                                }
+                                args.push(self.parse_expression()?);
+                                if let Some(t) = self.current_token()
+                                    && t.kind == TokenKind::Comma
+                                {
+                                    self.advance();
+                                }
+                            }
+                            self.expect_token(TokenKind::RParen)?;
+                            return Ok(Expr {
+                                kind: ExprKind::Call { name, args },
                                 line,
                                 column: col,
                             });
@@ -178,30 +218,6 @@ impl Parser {
                         self.advance();
                         Ok(Expr {
                             kind: ExprKind::Identifier(name),
-                            line,
-                            column: col,
-                        })
-                    }
-                    TokenKind::True => {
-                        self.advance();
-                        Ok(Expr {
-                            kind: ExprKind::Boolean(true),
-                            line,
-                            column: col,
-                        })
-                    }
-                    TokenKind::False => {
-                        self.advance();
-                        Ok(Expr {
-                            kind: ExprKind::Boolean(false),
-                            line,
-                            column: col,
-                        })
-                    }
-                    TokenKind::Empty => {
-                        self.advance();
-                        Ok(Expr {
-                            kind: ExprKind::Empty,
                             line,
                             column: col,
                         })
@@ -249,6 +265,16 @@ impl Parser {
                 }
                 _ => break,
             }
+        }
+
+        // Empty string "" — parts contains one ExprKind::String("") which is correct
+        // But if parts is somehow empty (shouldn't happen), return empty string
+        if parts.is_empty() {
+            return Ok(Expr {
+                kind: ExprKind::String(String::new()),
+                line: start_line,
+                column: start_col,
+            });
         }
 
         if parts.len() == 1 {

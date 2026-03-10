@@ -1,0 +1,7 @@
+void main() {
+    string blank = "";
+    print("before");
+    print(blank);
+    print("");
+    print("after");
+}

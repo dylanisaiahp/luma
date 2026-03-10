@@ -55,8 +55,14 @@ impl Lexer {
 
         if ch == '"' {
             let mut string_tokens = self.read_string()?;
+            // Empty string "" — return an empty StringLiteral token
             if string_tokens.is_empty() {
-                return Err(LexerError::UnexpectedCharacter('"', line, col));
+                return Ok(Token {
+                    kind: TokenKind::StringLiteral(String::new()),
+                    line,
+                    column: col,
+                    byte_pos,
+                });
             }
             let first_token = string_tokens.remove(0);
             for token in string_tokens.into_iter().rev() {
