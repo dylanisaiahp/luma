@@ -179,7 +179,6 @@ impl Interpreter {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
-        // Clear any stale slot from a previous call before executing the body.
         self.return_slot = None;
 
         self.push_scope();
@@ -195,7 +194,6 @@ impl Interpreter {
                 Err(e) if e.message.starts_with("__return__") => {
                     let encoded = e.message.strip_prefix("__return__").unwrap_or("");
                     return_value = if encoded == "__return_slot__" {
-                        // A List or Table was stashed in the slot by encode_return_value.
                         self.return_slot.take().unwrap_or(Value::Void)
                     } else {
                         Interpreter::decode_return_value(encoded)
@@ -204,7 +202,6 @@ impl Interpreter {
                 }
                 Err(e) => {
                     self.pop_scope();
-                    // Clear the slot on error paths so stale data never leaks.
                     self.return_slot = None;
                     return Err(e);
                 }
@@ -213,7 +210,6 @@ impl Interpreter {
 
         self.pop_scope();
 
-        // Void enforcement: void functions must not return a value
         if func.return_type == "void" && return_value != Value::Void {
             return Err(RuntimeError {
                 message: format!(
@@ -322,44 +318,14 @@ impl Interpreter {
         let mut matched = false;
 
         for arm in arms {
-            match &arm.pattern {
-                MatchPattern::Integer(n) => {
-                    if let Value::Integer(m) = &match_val
-                        && m == n
-                    {
-                        self.push_scope();
-                        for stmt in &arm.body {
-                            self.execute_statement(stmt)?;
-                        }
-                        self.pop_scope();
-                        matched = true;
-                        break;
-                    }
+            let is_match = self.pattern_matches(&arm.pattern, &match_val);
+            if is_match {
+                self.push_scope();
+                for stmt in &arm.body {
+                    self.execute_statement(stmt)?;
                 }
-                MatchPattern::Range(start, end) => {
-                    if let Value::Integer(m) = &match_val
-                        && { m >= start && m <= end }
-                    {
-                        self.push_scope();
-                        for stmt in &arm.body {
-                            self.execute_statement(stmt)?;
-                        }
-                        self.pop_scope();
-                        matched = true;
-                        break;
-                    }
-                }
-                MatchPattern::Wildcard => {
-                    self.push_scope();
-                    for stmt in &arm.body {
-                        self.execute_statement(stmt)?;
-                    }
-                    self.pop_scope();
-                    matched = true;
-                    break;
-                }
-            }
-            if matched {
+                self.pop_scope();
+                matched = true;
                 break;
             }
         }
@@ -373,5 +339,17 @@ impl Interpreter {
         }
 
         Ok(Value::Void)
+    }
+
+    fn pattern_matches(&self, pattern: &MatchPattern, value: &Value) -> bool {
+        match pattern {
+            MatchPattern::Integer(n) => matches!(value, Value::Integer(m) if m == n),
+            MatchPattern::Range(start, end) => {
+                matches!(value, Value::Integer(m) if m >= start && m <= end)
+            }
+            MatchPattern::Wildcard => true,
+            MatchPattern::String(s) => matches!(value, Value::String(m) if m == s),
+            MatchPattern::Set(patterns) => patterns.iter().any(|p| self.pattern_matches(p, value)),
+        }
     }
 }

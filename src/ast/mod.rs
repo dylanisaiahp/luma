@@ -68,6 +68,8 @@ pub enum MatchPattern {
     Integer(i64),
     Range(i64, i64),
     Wildcard,
+    String(String),         // "hello":
+    Set(Vec<MatchPattern>), // ("help", "h", 1):
 }
 
 #[derive(Debug, Clone, PartialEq)]
