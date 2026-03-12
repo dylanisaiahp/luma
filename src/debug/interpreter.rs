@@ -110,5 +110,6 @@ fn format_value(val: &Value) -> String {
         Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
         Value::InputHandle => "input()".to_string(),
         Value::FileHandle(path) => format!("file(\"{}\")", path),
+        Value::Struct { name, fields } => format!("{}({} fields)", name, fields.len()),
     }
 }

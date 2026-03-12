@@ -18,6 +18,7 @@ impl Parser {
                 Some(Stmt::Break)
             }
             Some(TokenKind::For) => self.parse_for_statement(),
+            Some(TokenKind::Struct) => self.parse_struct_declaration(),
             Some(TokenKind::Int)
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
@@ -27,6 +28,19 @@ impl Parser {
             | Some(TokenKind::Maybe)
             | Some(TokenKind::List)
             | Some(TokenKind::Table) => self.parse_variable_declaration(),
+            // Struct variable declaration: Point p = ...
+            // Detect: Identifier Identifier = pattern
+            Some(TokenKind::Identifier(_))
+                if matches!(
+                    self.tokens.get(self.position + 1),
+                    Some(t) if matches!(&t.kind, TokenKind::Identifier(_))
+                ) && matches!(
+                    self.tokens.get(self.position + 2),
+                    Some(t) if t.kind == TokenKind::Equals
+                ) =>
+            {
+                self.parse_variable_declaration()
+            }
             Some(TokenKind::If) => self.parse_if_statement(),
             Some(TokenKind::While) => self.parse_while_statement(),
             Some(TokenKind::Match) => self.parse_match_statement(),

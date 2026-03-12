@@ -3,7 +3,7 @@ use crate::ast::Stmt;
 use crate::debug::InterpreterDebug;
 use crate::error::diagnostic::Diagnostic;
 use crate::interpreter::value::{RuntimeError, Value};
-use crate::interpreter::{FunctionDef, VarInfo};
+use crate::interpreter::{FunctionDef, StructDef, VarInfo};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Default)]
@@ -13,6 +13,7 @@ pub struct Interpreter {
     pub used_variables: HashSet<String>,
     pub warnings: Vec<Diagnostic>,
     pub functions: HashMap<String, FunctionDef>,
+    pub struct_defs: HashMap<String, StructDef>,
     pub debug: InterpreterDebug,
     pub output_buffer: Vec<String>,
     pub debug_mode: bool,
@@ -30,6 +31,7 @@ impl Interpreter {
             used_variables: HashSet::new(),
             warnings: Vec::new(),
             functions: HashMap::new(),
+            struct_defs: HashMap::new(),
             debug: InterpreterDebug::new(),
             output_buffer: Vec::new(),
             debug_mode: false,
@@ -105,22 +107,36 @@ impl Interpreter {
 
     fn register_functions(&mut self, statements: &[Stmt]) {
         for stmt in statements {
-            if let Stmt::Function {
-                return_type,
-                name,
-                params,
-                body,
-            } = stmt
-                && name != "main"
-            {
-                self.functions.insert(
-                    name.clone(),
-                    FunctionDef {
-                        return_type: return_type.clone(),
-                        params: params.clone(),
-                        body: body.clone(),
-                    },
-                );
+            match stmt {
+                Stmt::Function {
+                    return_type,
+                    name,
+                    params,
+                    body,
+                } if name != "main" => {
+                    self.functions.insert(
+                        name.clone(),
+                        FunctionDef {
+                            return_type: return_type.clone(),
+                            params: params.clone(),
+                            body: body.clone(),
+                        },
+                    );
+                }
+                Stmt::StructDeclaration {
+                    name,
+                    fields,
+                    methods,
+                } => {
+                    self.struct_defs.insert(
+                        name.clone(),
+                        StructDef {
+                            fields: fields.clone(),
+                            methods: methods.clone(),
+                        },
+                    );
+                }
+                _ => {}
             }
         }
     }
@@ -157,6 +173,8 @@ impl Interpreter {
                 }
                 Ok(Value::Void)
             }
+            // Struct declarations are registered during register_functions; nothing to execute
+            Stmt::StructDeclaration { .. } => Ok(Value::Void),
             Stmt::Use { module } => {
                 eprintln!(
                     "[!] 'use {}' — imports are not yet supported. Coming soon!",
@@ -264,6 +282,7 @@ impl Interpreter {
             Value::FetchHandle(url) => format!("fetch:{}", url),
             Value::InputHandle => "input:".to_string(),
             Value::FileHandle(path) => format!("file:{}", path),
+            Value::Struct { name, .. } => format!("struct:{}", name),
         }
     }
 

@@ -12,39 +12,97 @@ impl Parser {
             match self.current_token().map(|t| t.kind.clone()) {
                 Some(TokenKind::LParen) => {
                     let token = self.current_token().cloned().unwrap();
-                    self.advance();
 
-                    let mut args = Vec::new();
-                    if let Some(next) = self.current_token()
-                        && next.kind != TokenKind::RParen
-                    {
-                        args.push(self.parse_expression()?);
-                        while let Some(t) = self.current_token().cloned() {
-                            if t.kind == TokenKind::Comma {
-                                self.advance();
-                                args.push(self.parse_expression()?);
-                            } else {
+                    // Detect struct instantiation: Identifier(fieldName: value, ...)
+                    // Lookahead: current=LParen, next=Identifier, after=Colon
+                    let is_struct_instantiate = matches!(&expr.kind, ExprKind::Identifier(_))
+                        && matches!(self.tokens.get(self.position + 1), Some(t) if matches!(&t.kind, TokenKind::Identifier(_)))
+                        && matches!(self.tokens.get(self.position + 2), Some(t) if t.kind == TokenKind::Colon);
+
+                    if is_struct_instantiate {
+                        let struct_name = match &expr.kind {
+                            ExprKind::Identifier(n) => n.clone(),
+                            _ => unreachable!(),
+                        };
+                        self.advance(); // consume '('
+                        let mut fields = Vec::new();
+
+                        while let Some(t) = self.current_token() {
+                            if t.kind == TokenKind::RParen {
                                 break;
                             }
-                        }
-                    }
-                    self.expect_token(TokenKind::RParen)?;
-
-                    match expr.kind {
-                        ExprKind::Identifier(name) => {
-                            expr = Expr {
-                                kind: ExprKind::Call { name, args },
-                                line: token.line,
-                                column: token.column,
+                            // field_name: value
+                            let field_name = match self.current_token().cloned() {
+                                Some(t) => match t.kind {
+                                    TokenKind::Identifier(n) => {
+                                        self.advance();
+                                        n
+                                    }
+                                    _ => {
+                                        return Err(ParseError::UnexpectedToken {
+                                            expected: "field name".to_string(),
+                                            got: t.kind,
+                                            line_num: t.line,
+                                            col_num: t.column,
+                                        });
+                                    }
+                                },
+                                None => return Err(ParseError::UnexpectedEOF),
                             };
+                            self.expect_token(TokenKind::Colon)?;
+                            let value = self.parse_expression()?;
+                            fields.push((field_name, value));
+
+                            if let Some(t) = self.current_token()
+                                && t.kind == TokenKind::Comma
+                            {
+                                self.advance();
+                            }
                         }
-                        _ => {
-                            return Err(ParseError::UnexpectedToken {
-                                expected: "function name".to_string(),
-                                got: token.kind,
-                                line_num: token.line,
-                                col_num: token.column,
-                            });
+                        self.expect_token(TokenKind::RParen)?;
+
+                        expr = Expr {
+                            kind: ExprKind::StructInstantiate {
+                                name: struct_name,
+                                fields,
+                            },
+                            line: token.line,
+                            column: token.column,
+                        };
+                    } else {
+                        self.advance(); // consume '('
+                        let mut args = Vec::new();
+                        if let Some(next) = self.current_token()
+                            && next.kind != TokenKind::RParen
+                        {
+                            args.push(self.parse_expression()?);
+                            while let Some(t) = self.current_token().cloned() {
+                                if t.kind == TokenKind::Comma {
+                                    self.advance();
+                                    args.push(self.parse_expression()?);
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                        self.expect_token(TokenKind::RParen)?;
+
+                        match expr.kind {
+                            ExprKind::Identifier(name) => {
+                                expr = Expr {
+                                    kind: ExprKind::Call { name, args },
+                                    line: token.line,
+                                    column: token.column,
+                                };
+                            }
+                            _ => {
+                                return Err(ParseError::UnexpectedToken {
+                                    expected: "function name".to_string(),
+                                    got: token.kind,
+                                    line_num: token.line,
+                                    col_num: token.column,
+                                });
+                            }
                         }
                     }
                 }
@@ -52,8 +110,8 @@ impl Parser {
                     let dot_token = self.current_token().cloned().unwrap();
                     self.advance(); // consume '.'
 
-                    // Expect method name — keywords are valid method names
-                    let method = match self.current_token().cloned() {
+                    // Expect method/field name — keywords are valid
+                    let member = match self.current_token().cloned() {
                         Some(t) => {
                             let name = keyword_as_method_name(&t.kind);
                             if let Some(name) = name {
@@ -64,7 +122,7 @@ impl Parser {
                                 name
                             } else {
                                 return Err(ParseError::UnexpectedToken {
-                                    expected: "method name".to_string(),
+                                    expected: "field or method name".to_string(),
                                     got: t.kind,
                                     line_num: t.line,
                                     col_num: t.column,
@@ -74,8 +132,8 @@ impl Parser {
                         None => return Err(ParseError::UnexpectedEOF),
                     };
 
-                    // Parse optional args — special case: .as(type) accepts type keywords
-                    let args = if let Some(t) = self.current_token()
+                    // If next token is '(' it's a method call, otherwise it's a field access
+                    if let Some(t) = self.current_token()
                         && t.kind == TokenKind::LParen
                     {
                         self.advance(); // consume '('
@@ -84,7 +142,7 @@ impl Parser {
                             && next.kind != TokenKind::RParen
                         {
                             // For .as(), .first(), .last() — accept bare type keywords as string args
-                            if method == "as" || method == "first" || method == "last" {
+                            if member == "as" || member == "first" || member == "last" {
                                 if let Some(type_name) = type_keyword_as_string(
                                     &self
                                         .current_token()
@@ -116,20 +174,26 @@ impl Parser {
                             }
                         }
                         self.expect_token(TokenKind::RParen)?;
-                        args
+                        expr = Expr {
+                            kind: ExprKind::MethodCall {
+                                object: Box::new(expr),
+                                method: member,
+                                args,
+                            },
+                            line: dot_token.line,
+                            column: dot_token.column,
+                        };
                     } else {
-                        Vec::new()
-                    };
-
-                    expr = Expr {
-                        kind: ExprKind::MethodCall {
-                            object: Box::new(expr),
-                            method,
-                            args,
-                        },
-                        line: dot_token.line,
-                        column: dot_token.column,
-                    };
+                        // No '(' — field access
+                        expr = Expr {
+                            kind: ExprKind::FieldAccess {
+                                object: Box::new(expr),
+                                field: member,
+                            },
+                            line: dot_token.line,
+                            column: dot_token.column,
+                        };
+                    }
                 }
                 _ => break,
             }

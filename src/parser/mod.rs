@@ -12,6 +12,7 @@ mod matching;
 mod primary;
 mod printing;
 mod statements;
+mod structs;
 mod whileloop;
 
 pub use core::Parser;

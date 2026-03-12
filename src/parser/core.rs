@@ -358,6 +358,11 @@ impl Parser {
                         statements.push(func);
                     }
                 }
+                TokenKind::Struct => {
+                    if let Some(stmt) = self.parse_struct_declaration() {
+                        statements.push(stmt);
+                    }
+                }
                 TokenKind::Use => {
                     self.advance(); // consume 'use'
                     let module = match self.current_token().map(|t| &t.kind) {

@@ -12,7 +12,7 @@ pub enum ExprKind {
     Integer(i64),
     Float(f64),
     String(String),
-    Char(String), // single-quoted literal: 'x' or 'hello' — coerced to Char/Word at declaration
+    Char(String),
     Boolean(bool),
     Identifier(String),
     Interpolation(String),
@@ -47,6 +47,16 @@ pub enum ExprKind {
     List(Vec<Expr>),
     Table(Vec<(Expr, Expr)>),
     Empty,
+    // Struct instantiation: Point(x: 1, y: 2)
+    StructInstantiate {
+        name: String,
+        fields: Vec<(String, Expr)>,
+    },
+    // Field access: p.x  (handled by MethodCall with no args, but FieldAccess is cleaner)
+    FieldAccess {
+        object: Box<Expr>,
+        field: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -68,14 +78,30 @@ pub enum MatchPattern {
     Integer(i64),
     Range(i64, i64),
     Wildcard,
-    String(String),         // "hello":
-    Set(Vec<MatchPattern>), // ("help", "h", 1):
+    String(String),
+    Set(Vec<MatchPattern>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
     pub type_name: String,
     pub name: String,
+}
+
+// A field definition inside a struct
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub type_name: String,
+    pub name: String,
+}
+
+// A method definition inside a struct
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructMethod {
+    pub return_type: String,
+    pub name: String,
+    pub params: Vec<Param>,
+    pub body: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -86,6 +112,11 @@ pub enum Stmt {
         name: String,
         params: Vec<Param>,
         body: Vec<Stmt>,
+    },
+    StructDeclaration {
+        name: String,
+        fields: Vec<StructField>,
+        methods: Vec<StructMethod>,
     },
     VariableDeclaration {
         type_name: String,

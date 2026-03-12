@@ -1,11 +1,13 @@
 // src/interpreter/value.rs
+use std::collections::HashMap;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Integer(i64),
     Float(f64),
     String(String),
-    Char(char),   // single character: 'x'
-    Word(String), // single whitespace-free token: 'hello'
+    Char(char),
+    Word(String),
     Boolean(bool),
     Void,
     Maybe(Option<Box<Value>>),
@@ -14,6 +16,10 @@ pub enum Value {
     FetchHandle(String),
     InputHandle,
     FileHandle(String),
+    Struct {
+        name: String,
+        fields: HashMap<String, Value>,
+    },
 }
 
 #[derive(Debug)]
@@ -39,6 +45,7 @@ impl Value {
             Value::FetchHandle(_) => "fetch",
             Value::InputHandle => "input",
             Value::FileHandle(_) => "file",
+            Value::Struct { .. } => "struct",
         }
     }
 }

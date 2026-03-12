@@ -82,6 +82,14 @@ pub fn eval_method(
         Value::FetchHandle(url) => fetch_method(url, method, args, line, column),
         Value::InputHandle => input_method(method, args, line, column),
         Value::FileHandle(path) => file_method(path, method, args, line, column),
+        Value::Struct { name, .. } => Err(RuntimeError {
+            message: format!(
+                "struct '{}' has no builtin methods — use defined methods instead",
+                name
+            ),
+            line,
+            column,
+        }),
         Value::Void => Err(RuntimeError {
             message: format!("void has no method '{}'", method),
             line,

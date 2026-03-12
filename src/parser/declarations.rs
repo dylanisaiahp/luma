@@ -129,6 +129,29 @@ impl Parser {
                 }
                 Some(format!("table({}, {})", key_type, val_type))
             }
+            // Struct type — identifier used as type name (e.g. Point, Person)
+            // Only consume if followed by another identifier (the variable name)
+            Some(TokenKind::Identifier(name)) => {
+                if matches!(
+                    self.tokens.get(self.position + 1),
+                    Some(t) if matches!(&t.kind, TokenKind::Identifier(_))
+                ) {
+                    let name = name.clone();
+                    self.advance();
+                    Some(name)
+                } else {
+                    let token = self.current_or_eof();
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected:
+                            "type (int/float/bool/string/char/word/maybe/list/table or struct name)"
+                                .to_string(),
+                        got: token.kind,
+                        line_num: token.line,
+                        col_num: token.column,
+                    });
+                    None
+                }
+            }
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {

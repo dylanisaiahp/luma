@@ -56,6 +56,15 @@ impl Interpreter {
             Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
             Value::InputHandle => "input()".to_string(),
             Value::FileHandle(path) => format!("file(\"{}\")", path),
+            Value::Struct { name, fields } => {
+                let mut pairs: Vec<(&String, &Value)> = fields.iter().collect();
+                pairs.sort_by_key(|(k, _)| k.as_str());
+                let parts: Vec<String> = pairs
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, self.value_to_display_string(v)))
+                    .collect();
+                format!("{}({})", name, parts.join(", "))
+            }
         }
     }
 
@@ -145,6 +154,9 @@ impl Interpreter {
             // table
             (t, Value::Table(pairs)) if t.starts_with("table") => Value::Table(pairs),
             (t, Value::Maybe(None)) if t.starts_with("table") => Value::Table(Vec::new()),
+
+            // struct — type_name is the struct name e.g. "Point"
+            (t, Value::Struct { name, fields }) if t == name => Value::Struct { name, fields },
 
             (expected, actual) => {
                 return Err(RuntimeError {

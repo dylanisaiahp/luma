@@ -38,11 +38,12 @@ pub enum TokenKind {
     Table,
     Char,
     Word,
+    Struct,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
     StringLiteral(String),
-    CharLiteral(String), // single-quoted literal: 'x' or 'hello'
+    CharLiteral(String),
     Plus,
     Minus,
     Star,
@@ -105,6 +106,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Table => write!(f, "table"),
             TokenKind::Char => write!(f, "char"),
             TokenKind::Word => write!(f, "word"),
+            TokenKind::Struct => write!(f, "struct"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -174,6 +176,7 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Table => TokenKind::Table,
             crate::syntax::Keyword::Char => TokenKind::Char,
             crate::syntax::Keyword::Word => TokenKind::Word,
+            crate::syntax::Keyword::Struct => TokenKind::Struct,
         }
     }
 }

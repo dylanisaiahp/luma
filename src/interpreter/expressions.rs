@@ -12,8 +12,6 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Char(s) => {
-                // Single-quoted literal — single char becomes Char, multi-char becomes String
-                // Type coercion to Word happens at declaration site
                 let mut chars = s.chars();
                 match (chars.next(), chars.next()) {
                     (Some(c), None) => Ok(Value::Char(c)),
@@ -149,12 +147,40 @@ impl Interpreter {
                 let right_val = self.evaluate_expression(right)?;
                 operations::evaluate_binary_op(left_val, right_val, op, expr.line, expr.column)
             }
+            ExprKind::FieldAccess { object, field } => {
+                self.evaluate_field_access(object, field, expr.line, expr.column)
+            }
+            ExprKind::StructInstantiate { name, fields } => {
+                let fields_cloned = fields.clone();
+                self.evaluate_struct_instantiate(name, &fields_cloned, expr.line, expr.column)
+            }
             ExprKind::MethodCall {
                 object,
                 method,
                 args,
             } => {
+                // Check if the object resolves to a struct — if so, dispatch to struct method
                 let object_val = self.evaluate_expression(object)?;
+                if let Value::Struct { ref name, .. } = object_val {
+                    let struct_name = name.clone();
+                    if self
+                        .struct_defs
+                        .get(&struct_name)
+                        .map(|d| d.methods.iter().any(|m| &m.name == method))
+                        .unwrap_or(false)
+                    {
+                        let args_cloned = args.clone();
+                        let object_cloned = object.clone();
+                        return self.evaluate_struct_method_call(
+                            &object_cloned,
+                            method,
+                            &args_cloned,
+                            expr.line,
+                            expr.column,
+                        );
+                    }
+                }
+                // Fall through to builtins
                 let mut arg_vals = Vec::new();
                 for arg in args {
                     arg_vals.push(self.evaluate_expression(arg)?);

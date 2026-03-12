@@ -30,6 +30,7 @@ pub enum Keyword {
     Table,
     Char,
     Word,
+    Struct,
 }
 
 impl FromStr for Keyword {
@@ -63,6 +64,7 @@ impl FromStr for Keyword {
             "table" => Ok(Keyword::Table),
             "char" => Ok(Keyword::Char),
             "word" => Ok(Keyword::Word),
+            "struct" => Ok(Keyword::Struct),
             _ => Err(()),
         }
     }
