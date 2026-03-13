@@ -382,11 +382,64 @@ impl Parser {
                             continue;
                         }
                     };
+                    // Check for selective import: use parser.(core, error);
+                    let items = if let Some(TokenKind::Dot) = self.current_token().map(|t| &t.kind)
+                    {
+                        self.advance(); // consume '.'
+                        if let Err(e) = self.expect_token(TokenKind::LParen) {
+                            self.errors.push(e);
+                            continue;
+                        }
+                        let mut selected = Vec::new();
+                        while let Some(t) = self.current_token() {
+                            if t.kind == TokenKind::RParen {
+                                break;
+                            }
+                            if let TokenKind::Identifier(name) = &t.kind {
+                                selected.push(name.clone());
+                                self.advance();
+                            }
+                            if let Some(TokenKind::Comma) = self.current_token().map(|t| &t.kind) {
+                                self.advance();
+                            }
+                        }
+                        if let Err(e) = self.expect_token(TokenKind::RParen) {
+                            self.errors.push(e);
+                            continue;
+                        }
+                        Some(selected)
+                    } else {
+                        None
+                    };
                     // consume optional semicolon
                     if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
                         self.advance();
                     }
-                    statements.push(Stmt::Use { module });
+                    statements.push(Stmt::Use { module, items });
+                }
+                TokenKind::Module => {
+                    self.advance(); // consume 'module'
+                    let name = match self.current_token().map(|t| &t.kind) {
+                        Some(TokenKind::Identifier(n)) => {
+                            let n = n.clone();
+                            self.advance();
+                            n
+                        }
+                        _ => {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "module name".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
+                    };
+                    if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
+                        self.advance();
+                    }
+                    statements.push(Stmt::ModuleDeclaration { name });
                 }
                 TokenKind::Eof => break,
                 _ => {

@@ -5,7 +5,7 @@ use crate::error::ErrorCollector;
 
 use clap::{Parser, Subcommand};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 #[derive(Parser)]
@@ -20,10 +20,11 @@ pub enum Commands {
     /// Create a new Luma project
     New { name: String },
 
-    /// Run a Luma file
+    /// Run a Luma file or project
     #[command(trailing_var_arg = true)]
     Run {
-        file: String,
+        /// File to run (optional — reads luma.toml entry if omitted)
+        file: Option<String>,
         #[arg(long, help = "Show execution time")]
         time: bool,
         #[arg(
@@ -41,56 +42,207 @@ pub enum Commands {
     Check { file: String },
 }
 
+/// Parsed luma.toml
+#[derive(Debug)]
+struct LumaToml {
+    #[allow(dead_code)]
+    name: String,
+    #[allow(dead_code)]
+    version: String,
+    #[allow(dead_code)]
+    description: String,
+    entry: Option<String>,
+}
+
+impl LumaToml {
+    fn parse(content: &str) -> Self {
+        let mut name = String::new();
+        let mut version = String::new();
+        let mut description = String::new();
+        let mut entry = None;
+
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('[') {
+                continue; // skip section headers like [project]
+            }
+            if let Some(val) = parse_toml_string(line, "name") {
+                name = val;
+            } else if let Some(val) = parse_toml_string(line, "version") {
+                version = val;
+            } else if let Some(val) = parse_toml_string(line, "description") {
+                description = val;
+            } else if let Some(val) = parse_toml_string(line, "entry") {
+                entry = Some(val);
+            }
+        }
+
+        LumaToml { name, version, description, entry }
+    }
+}
+
+fn parse_toml_string(line: &str, key: &str) -> Option<String> {
+    let prefix = format!("{} =", key);
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    let rest = line[prefix.len()..].trim();
+    let rest = rest.strip_prefix('"')?.strip_suffix('"')?;
+    Some(rest.to_string())
+}
+
 pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
         Commands::New { name } => create_project(&name),
-        Commands::Run {
-            file,
-            time,
-            debug,
-            args: _,
-        } => {
+        Commands::Run { file, time, debug, args: _ } => {
             let flags: Vec<&str> = debug.iter().map(|s| s.as_str()).collect();
             let config = DebugConfig::from_flags(&flags);
-            run_file(&file, time, config)
+
+            let target = match file {
+                Some(f) => f,
+                None => resolve_entry_from_toml()?,
+            };
+
+            run_file(&target, time, config)
         }
         Commands::Check { file } => check_file(&file),
     }
 }
 
-fn create_project(name: &str) -> anyhow::Result<()> {
-    let path = Path::new(name);
-
-    if path.exists() {
-        anyhow::bail!("Directory '{}' already exists", name);
+/// Read luma.toml in the current directory and resolve the entry file path.
+fn resolve_entry_from_toml() -> anyhow::Result<String> {
+    let toml_path = Path::new("luma.toml");
+    if !toml_path.exists() {
+        anyhow::bail!(
+            "No file specified and no luma.toml found.\n\
+             Run 'luma run <file>' or create a luma.toml with an entry point."
+        );
     }
 
-    fs::create_dir(path)?;
-    fs::create_dir(path.join("lm"))?;
+    let content = fs::read_to_string(toml_path)?;
+    let config = LumaToml::parse(&content);
 
-    let main_content = r#"void main() {
-    print("Hello, Luma!");
+    match config.entry {
+        Some(entry) => {
+            // Try the path directly first
+            if Path::new(&entry).exists() {
+                return Ok(entry);
+            }
+            // Try to find it by filename under source/
+            let filename = Path::new(&entry)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&entry)
+                .to_string();
+            if let Some(found) = find_in_source(&filename) {
+                return Ok(found.to_string_lossy().to_string());
+            }
+            anyhow::bail!(
+                "Entry point '{}' not found.\n\
+                 Check your luma.toml or run 'luma run <file>' directly.",
+                entry
+            )
+        }
+        None => anyhow::bail!(
+            "luma.toml has no entry point defined.\n\
+             Add 'entry = \"source/main.lm\"' or run 'luma run <file>' directly."
+        ),
+    }
 }
-"#;
-    fs::write(path.join("lm/main.lm"), main_content)?;
 
-    let readme = format!("# {}\n\nA Luma project.\n", name);
-    fs::write(path.join("README.md"), readme)?;
-
-    println!("[✓] Created new Luma project: {}", name);
-    println!("    cd {} to get started", name);
-    println!("    lm/main.lm is your entry point");
-
-    Ok(())
+/// Recursively search source/ for a file with the given name.
+fn find_in_source(filename: &str) -> Option<PathBuf> {
+    search_dir(Path::new("source"), filename)
 }
 
-fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
-    let start = Instant::now();
+fn search_dir(dir: &Path, filename: &str) -> Option<PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = search_dir(&path, filename) {
+                return Some(found);
+            }
+        } else if path.file_name().and_then(|n| n.to_str()) == Some(filename) {
+            return Some(path);
+        }
+    }
+    None
+}
 
-    let source = fs::read_to_string(file)?;
-    let mut collector = ErrorCollector::new(&source, file);
+/// Resolve a `use` module name to a file path.
+/// Resolution order:
+///   1. Scan source/ recursively for a file containing `module <name>;`
+///   2. Check source/<name>.lm directly
+///   3. Check same directory as the importing file
+fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
+    // 1. Scan source/ for a file declaring `module <name>;`
+    if let Some(path) = find_module_declaration(Path::new("source"), module_name) {
+        return Some(path);
+    }
 
-    // Lexing
+    // 2. source/<name>.lm
+    let direct = PathBuf::from(format!("source/{}.lm", module_name));
+    if direct.exists() {
+        return Some(direct);
+    }
+
+    // 3. Same directory as importing file
+    if let Some(parent) = Path::new(importing_file).parent() {
+        let sibling = parent.join(format!("{}.lm", module_name));
+        if sibling.exists() {
+            return Some(sibling);
+        }
+    }
+
+    None
+}
+
+fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_module_declaration(&path, module_name) {
+                return Some(found);
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("lm")
+            && let Ok(content) = fs::read_to_string(&path)
+            && content
+                .lines()
+                .any(|l| l.trim() == format!("module {};", module_name))
+        {
+            return Some(path);
+        }
+    }
+    None
+}
+
+/// Load all statements from a use chain starting at `file_path`.
+/// Handles `use` statements recursively, avoiding cycles.
+fn load_with_uses(
+    file_path: &str,
+    visited: &mut std::collections::HashSet<String>,
+    collector: &mut ErrorCollector,
+    debug: &DebugConfig,
+) -> Vec<Stmt> {
+    let canonical = fs::canonicalize(file_path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| file_path.to_string());
+
+    if visited.contains(&canonical) {
+        return Vec::new();
+    }
+    visited.insert(canonical);
+
+    let source = match fs::read_to_string(file_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[!] Could not read '{}': {}", file_path, e);
+            return Vec::new();
+        }
+    };
+
     let mut lexer = crate::lexer::Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
 
@@ -102,52 +254,134 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
         collector.add_lexer_error(error);
     }
 
-    // Parsing
     let mut parser = crate::parser::Parser::new(tokens);
     let statements = parser.parse_program();
     let parse_errors = parser.take_errors();
-    let parse_error_count = parse_errors.len();
 
     if debug.parser {
-        crate::debug::parser::print_parser_debug(&statements, parse_error_count, debug.verbose);
+        crate::debug::parser::print_parser_debug(&statements, parse_errors.len(), debug.verbose);
     }
 
     for error in parse_errors {
         collector.add_parse_error(error);
     }
 
-    // Only interpret if parsing succeeded
-    if !collector.has_errors() {
-        let ast = Stmt::Program(statements);
-        let mut interpreter = crate::interpreter::Interpreter::new();
-        interpreter.debug_mode = debug.interpreter || debug.lexer || debug.parser;
+    // Expand use statements first
+    let mut expanded: Vec<Stmt> = Vec::new();
+    for stmt in statements {
+        match &stmt {
+            Stmt::Use { module, items } => {
+                match resolve_use(module, file_path) {
+                    Some(mod_path) => {
+                        let mod_path_str = mod_path.to_string_lossy().to_string();
+                        let mut mod_stmts =
+                            load_with_uses(&mod_path_str, visited, collector, debug);
 
-        match interpreter.interpret(&ast, &source, file) {
-            Ok(()) => {
-                if debug.interpreter {
-                    interpreter.debug.print_debug(debug.verbose);
-                }
-                // Flush buffered output after debug
-                for line in &interpreter.output_buffer {
-                    println!("{}", line);
-                }
-                for warning in interpreter.take_warnings() {
-                    collector.add_warning(warning);
+                        // If selective import: use parser.(core, error)
+                        // Filter to only the named items (functions/structs matching those names)
+                        if let Some(selected) = items {
+                            mod_stmts.retain(|s| match s {
+                                Stmt::Function { name, .. } => selected.contains(name),
+                                Stmt::StructDeclaration { name, .. } => selected.contains(name),
+                                _ => true,
+                            });
+                        }
+
+                        // Skip ModuleDeclaration stmts — they're metadata, not executable
+                        for s in mod_stmts {
+                            if !matches!(s, Stmt::ModuleDeclaration { .. }) {
+                                expanded.push(s);
+                            }
+                        }
+                    }
+                    None => {
+                        eprintln!(
+                            "[!] Could not resolve module '{}' (imported in '{}')",
+                            module, file_path
+                        );
+                    }
                 }
             }
-            Err(e) => {
-                if debug.interpreter {
-                    interpreter.debug.print_debug(debug.verbose);
-                }
-                for line in &interpreter.output_buffer {
-                    println!("{}", line);
-                }
-                collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
-            }
+            // ModuleDeclaration is metadata — keep it so callers can detect it
+            _ => expanded.push(stmt),
         }
     }
 
-    // Print errors after debug output with spacing
+    expanded
+}
+
+fn create_project(name: &str) -> anyhow::Result<()> {
+    let path = Path::new(name);
+
+    if path.exists() {
+        anyhow::bail!("Directory '{}' already exists", name);
+    }
+
+    fs::create_dir(path)?;
+    fs::create_dir(path.join("source"))?;
+
+    let main_content = "void main() {\n    print(\"Hello, Luma!\");\n}\n";
+    fs::write(path.join("source/main.lm"), main_content)?;
+
+    let toml_content = format!(
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\ndescription = \"\"\nentry = \"source/main.lm\"\n",
+        name
+    );
+    fs::write(path.join("luma.toml"), toml_content)?;
+
+    let readme = format!("# {}\n\nA Luma project.\n", name);
+    fs::write(path.join("README.md"), readme)?;
+
+    println!("[✓] Created new Luma project: {}", name);
+    println!("    cd {}", name);
+    println!("    luma run");
+
+    Ok(())
+}
+
+fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
+    let start = Instant::now();
+
+    let source = fs::read_to_string(file)?;
+    let mut collector = ErrorCollector::new(&source, file);
+
+    // Load the entry file, recursively resolving use statements
+    let mut visited = std::collections::HashSet::new();
+    let statements = load_with_uses(file, &mut visited, &mut collector, &debug);
+
+    if collector.has_errors() {
+        println!();
+        collector.print_all();
+        std::process::exit(1);
+    }
+
+    let ast = Stmt::Program(statements);
+    let mut interpreter = crate::interpreter::Interpreter::new();
+    interpreter.debug_mode = debug.interpreter || debug.lexer || debug.parser;
+
+    match interpreter.interpret(&ast, &source, file) {
+        Ok(()) => {
+            if debug.interpreter {
+                interpreter.debug.print_debug(debug.verbose);
+            }
+            for line in &interpreter.output_buffer {
+                println!("{}", line);
+            }
+            for warning in interpreter.take_warnings() {
+                collector.add_warning(warning);
+            }
+        }
+        Err(e) => {
+            if debug.interpreter {
+                interpreter.debug.print_debug(debug.verbose);
+            }
+            for line in &interpreter.output_buffer {
+                println!("{}", line);
+            }
+            collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
+        }
+    }
+
     if collector.has_errors() {
         println!();
     }
@@ -161,6 +395,7 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
         let duration = start.elapsed();
         println!("\n⚡ Completed in {:?}", duration);
     }
+
     Ok(())
 }
 

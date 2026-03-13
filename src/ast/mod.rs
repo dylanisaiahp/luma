@@ -47,12 +47,10 @@ pub enum ExprKind {
     List(Vec<Expr>),
     Table(Vec<(Expr, Expr)>),
     Empty,
-    // Struct instantiation: Point(x: 1, y: 2)
     StructInstantiate {
         name: String,
         fields: Vec<(String, Expr)>,
     },
-    // Field access: p.x  (handled by MethodCall with no args, but FieldAccess is cleaner)
     FieldAccess {
         object: Box<Expr>,
         field: String,
@@ -88,14 +86,12 @@ pub struct Param {
     pub name: String,
 }
 
-// A field definition inside a struct
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
     pub type_name: String,
     pub name: String,
 }
 
-// A method definition inside a struct
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructMethod {
     pub return_type: String,
@@ -117,6 +113,9 @@ pub enum Stmt {
         name: String,
         fields: Vec<StructField>,
         methods: Vec<StructMethod>,
+    },
+    ModuleDeclaration {
+        name: String,
     },
     VariableDeclaration {
         type_name: String,
@@ -161,6 +160,7 @@ pub enum Stmt {
     },
     Use {
         module: String,
+        items: Option<Vec<String>>,
     },
     Raise {
         message: Expr,

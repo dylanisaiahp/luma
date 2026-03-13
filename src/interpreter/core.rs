@@ -175,13 +175,8 @@ impl Interpreter {
             }
             // Struct declarations are registered during register_functions; nothing to execute
             Stmt::StructDeclaration { .. } => Ok(Value::Void),
-            Stmt::Use { module } => {
-                eprintln!(
-                    "[!] 'use {}' — imports are not yet supported. Coming soon!",
-                    module
-                );
-                Ok(Value::Void)
-            }
+            Stmt::Use { .. } => Ok(Value::Void),
+            Stmt::ModuleDeclaration { .. } => Ok(Value::Void),
             Stmt::Print(expr) => self.execute_print(expr),
             Stmt::VariableDeclaration {
                 type_name,

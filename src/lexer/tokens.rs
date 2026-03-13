@@ -39,6 +39,7 @@ pub enum TokenKind {
     Char,
     Word,
     Struct,
+    Module,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
@@ -107,6 +108,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Char => write!(f, "char"),
             TokenKind::Word => write!(f, "word"),
             TokenKind::Struct => write!(f, "struct"),
+            TokenKind::Module => write!(f, "module"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -177,6 +179,7 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Char => TokenKind::Char,
             crate::syntax::Keyword::Word => TokenKind::Word,
             crate::syntax::Keyword::Struct => TokenKind::Struct,
+            crate::syntax::Keyword::Module => TokenKind::Module,
         }
     }
 }
