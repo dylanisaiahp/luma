@@ -382,32 +382,52 @@ impl Parser {
                             continue;
                         }
                     };
-                    // Check for selective import: use parser.(core, error);
+                    // Check for selective import:
+                    //   use http.client;           — single item, no parens
+                    //   use http.(client, request); — multiple items
                     let items = if let Some(TokenKind::Dot) = self.current_token().map(|t| &t.kind)
                     {
                         self.advance(); // consume '.'
-                        if let Err(e) = self.expect_token(TokenKind::LParen) {
-                            self.errors.push(e);
+                        if let Some(TokenKind::LParen) = self.current_token().map(|t| &t.kind) {
+                            // Multiple: use http.(client, request);
+                            self.advance(); // consume '('
+                            let mut selected = Vec::new();
+                            while let Some(t) = self.current_token() {
+                                if t.kind == TokenKind::RParen {
+                                    break;
+                                }
+                                if let TokenKind::Identifier(name) = &t.kind {
+                                    selected.push(name.clone());
+                                    self.advance();
+                                }
+                                if let Some(TokenKind::Comma) =
+                                    self.current_token().map(|t| &t.kind)
+                                {
+                                    self.advance();
+                                }
+                            }
+                            if let Err(e) = self.expect_token(TokenKind::RParen) {
+                                self.errors.push(e);
+                                continue;
+                            }
+                            Some(selected)
+                        } else if let Some(TokenKind::Identifier(name)) =
+                            self.current_token().map(|t| &t.kind)
+                        {
+                            // Single: use http.client;
+                            let name = name.clone();
+                            self.advance();
+                            Some(vec![name])
+                        } else {
+                            let token = self.current_or_eof();
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "item name or '('".to_string(),
+                                got: token.kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
                             continue;
                         }
-                        let mut selected = Vec::new();
-                        while let Some(t) = self.current_token() {
-                            if t.kind == TokenKind::RParen {
-                                break;
-                            }
-                            if let TokenKind::Identifier(name) = &t.kind {
-                                selected.push(name.clone());
-                                self.advance();
-                            }
-                            if let Some(TokenKind::Comma) = self.current_token().map(|t| &t.kind) {
-                                self.advance();
-                            }
-                        }
-                        if let Err(e) = self.expect_token(TokenKind::RParen) {
-                            self.errors.push(e);
-                            continue;
-                        }
-                        Some(selected)
                     } else {
                         None
                     };

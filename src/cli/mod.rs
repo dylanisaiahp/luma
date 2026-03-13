@@ -77,7 +77,12 @@ impl LumaToml {
             }
         }
 
-        LumaToml { name, version, description, entry }
+        LumaToml {
+            name,
+            version,
+            description,
+            entry,
+        }
     }
 }
 
@@ -94,7 +99,12 @@ fn parse_toml_string(line: &str, key: &str) -> Option<String> {
 pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
         Commands::New { name } => create_project(&name),
-        Commands::Run { file, time, debug, args: _ } => {
+        Commands::Run {
+            file,
+            time,
+            debug,
+            args: _,
+        } => {
             let flags: Vec<&str> = debug.iter().map(|s| s.as_str()).collect();
             let config = DebugConfig::from_flags(&flags);
 
@@ -176,13 +186,24 @@ fn search_dir(dir: &Path, filename: &str) -> Option<PathBuf> {
 ///   2. Check source/<name>.lm directly
 ///   3. Check same directory as the importing file
 fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
-    // 1. Scan source/ for a file declaring `module <name>;`
-    if let Some(path) = find_module_declaration(Path::new("source"), module_name) {
+    let direct = PathBuf::from(format!("source/{}.lm", module_name));
+    let declared = find_module_declaration(Path::new("source"), module_name);
+
+    // Conflict: both source/<n>.lm and a module declaration exist
+    if direct.exists() && declared.is_some() {
+        eprintln!(
+            "[!] Module conflict: '{}' matches both 'source/{}.lm' and a 'module {};' declaration.\n    Remove one to resolve the conflict.",
+            module_name, module_name, module_name
+        );
+        std::process::exit(1);
+    }
+
+    // 1. Scan source/ for a file declaring `module <n>;`
+    if let Some(path) = declared {
         return Some(path);
     }
 
-    // 2. source/<name>.lm
-    let direct = PathBuf::from(format!("source/{}.lm", module_name));
+    // 2. source/<n>.lm
     if direct.exists() {
         return Some(direct);
     }
