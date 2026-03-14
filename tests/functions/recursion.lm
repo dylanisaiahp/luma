@@ -1,0 +1,70 @@
+# recursion.lm
+#
+# NOTE FOR CLAUDE
+# ----------------
+# Luma recursion mostly works, but Fibonacci fails.
+#
+# Test results:
+# - count() works (simple recursion)
+# - sum_down() works (recursion + return propagation)
+# - fib() fails when evaluating two recursive calls in one expression:
+#
+#     return fib(n - 1) + fib(n - 2);
+#
+# Expected: fib(5) = 5
+# Actual output: -3
+#
+# This suggests recursion itself is working, but the interpreter may have
+# a bug when evaluating binary expressions that contain multiple function
+# calls. One possibility is that the result of the first call is being
+# overwritten when evaluating the second call, or that both calls share
+# a temporary evaluation slot.
+#
+# In other words:
+#   left = fib(n - 1)
+#   right = fib(n - 2)
+# may not be stored separately before applying the + operator.
+#
+# count() and sum_down() prove recursion + return propagation are correct,
+# so the issue likely exists in BinaryExpr evaluation rather than in the
+# call stack or recursion implementation.
+
+# Test 1: simple recursion (side effects only)
+void count(int n) {
+    print(n);
+
+    if (n == 0) {
+        return;
+    }
+
+    count(n - 1);
+}
+
+# Test 2: recursion with return propagation
+int sum_down(int n) {
+    if (n == 0) {
+        return 0;
+    }
+
+    return n + sum_down(n - 1);
+}
+
+# Test 3: fibonacci (two recursive calls in expression)
+int fib(int n) {
+    if (n <= 1) {
+        return n;
+    }
+
+    return fib(n - 1) + fib(n - 2);
+}
+
+void main() {
+    print("Test 1: count");
+    count(5);
+
+    print("Test 2: sum_down(5)");
+    print(sum_down(5));  # expected: 15
+
+    print("Test 3: fib(5)");
+    print(fib(5));       # expected: 5
+}

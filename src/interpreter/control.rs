@@ -29,6 +29,7 @@ impl Interpreter {
             self.push_scope();
             self.declare_variable(var, Value::Integer(i));
             let mut should_break = false;
+            let mut return_err = None;
             for stmt in body {
                 match self.execute_statement(stmt) {
                     Ok(_) => {}
@@ -37,12 +38,15 @@ impl Interpreter {
                         break;
                     }
                     Err(e) => {
-                        self.pop_scope();
-                        return Err(e);
+                        return_err = Some(e);
+                        break;
                     }
                 }
             }
             self.pop_scope();
+            if let Some(e) = return_err {
+                return Err(e);
+            }
             if should_break {
                 break;
             }
@@ -74,6 +78,7 @@ impl Interpreter {
             self.push_scope();
             self.declare_variable(var, item);
             let mut should_break = false;
+            let mut return_err = None;
             for stmt in body {
                 match self.execute_statement(stmt) {
                     Ok(_) => {}
@@ -82,12 +87,15 @@ impl Interpreter {
                         break;
                     }
                     Err(e) => {
-                        self.pop_scope();
-                        return Err(e);
+                        return_err = Some(e);
+                        break;
                     }
                 }
             }
             self.pop_scope();
+            if let Some(e) = return_err {
+                return Err(e);
+            }
             if should_break {
                 break;
             }
@@ -121,6 +129,7 @@ impl Interpreter {
             self.declare_variable(key_var, k);
             self.declare_variable(val_var, v);
             let mut should_break = false;
+            let mut return_err = None;
             for stmt in body {
                 match self.execute_statement(stmt) {
                     Ok(_) => {}
@@ -129,12 +138,15 @@ impl Interpreter {
                         break;
                     }
                     Err(e) => {
-                        self.pop_scope();
-                        return Err(e);
+                        return_err = Some(e);
+                        break;
                     }
                 }
             }
             self.pop_scope();
+            if let Some(e) = return_err {
+                return Err(e);
+            }
             if should_break {
                 break;
             }
@@ -179,7 +191,9 @@ impl Interpreter {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
-        self.return_slot = None;
+        // Save and restore return_slot so nested calls don't clobber each other.
+        // e.g. fib(n-1) + fib(n-2): the second call must not wipe the first call's slot.
+        let saved_return_slot = self.return_slot.take();
 
         self.push_scope();
 
@@ -202,13 +216,18 @@ impl Interpreter {
                 }
                 Err(e) => {
                     self.pop_scope();
-                    self.return_slot = None;
+                    self.return_slot = saved_return_slot;
                     return Err(e);
                 }
             }
         }
 
         self.pop_scope();
+
+        // Restore the caller's return_slot now that this call is done
+        if self.return_slot.is_none() {
+            self.return_slot = saved_return_slot;
+        }
 
         if func.return_type == "void" && return_value != Value::Void {
             return Err(RuntimeError {
@@ -242,6 +261,7 @@ impl Interpreter {
                 Value::Boolean(true) => {
                     self.push_scope();
                     let mut should_break = false;
+                    let mut return_err = None;
                     for stmt in body {
                         match self.execute_statement(stmt) {
                             Ok(_) => {}
@@ -250,12 +270,15 @@ impl Interpreter {
                                 break;
                             }
                             Err(e) => {
-                                self.pop_scope();
-                                return Err(e);
+                                return_err = Some(e);
+                                break;
                             }
                         }
                     }
                     self.pop_scope();
+                    if let Some(e) = return_err {
+                        return Err(e);
+                    }
                     if should_break {
                         break;
                     }
@@ -283,29 +306,44 @@ impl Interpreter {
         match cond_val {
             Value::Boolean(true) => {
                 self.push_scope();
+                let mut result = Ok(Value::Void);
                 for stmt in then_branch {
-                    self.execute_statement(stmt)?;
+                    match self.execute_statement(stmt) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            result = Err(e);
+                            break;
+                        }
+                    }
                 }
                 self.pop_scope();
+                result
             }
             Value::Boolean(false) => {
                 if let Some(else_branch) = else_branch {
                     self.push_scope();
+                    let mut result = Ok(Value::Void);
                     for stmt in else_branch {
-                        self.execute_statement(stmt)?;
+                        match self.execute_statement(stmt) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                result = Err(e);
+                                break;
+                            }
+                        }
                     }
                     self.pop_scope();
+                    result
+                } else {
+                    Ok(Value::Void)
                 }
             }
-            _ => {
-                return Err(RuntimeError {
-                    message: format!("If condition must be a boolean, got {:?}", cond_val),
-                    line: condition.line,
-                    column: condition.column,
-                });
-            }
+            _ => Err(RuntimeError {
+                message: format!("If condition must be a boolean, got {:?}", cond_val),
+                line: condition.line,
+                column: condition.column,
+            }),
         }
-        Ok(Value::Void)
     }
 
     pub fn execute_match(
