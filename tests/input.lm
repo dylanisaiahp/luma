@@ -1,9 +1,0 @@
-void main() {
-    string name = input(0);
-    bool help = input().flag("help");
-    string lang = input().option("lang");
-
-    print("Hello, &{name}!");
-    print(help);
-    print("Language: &{lang}");
-}

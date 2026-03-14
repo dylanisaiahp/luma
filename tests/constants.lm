@@ -1,6 +1,0 @@
-void main() {
-    print(int.max);
-    print(int.min);
-    print(float.max);
-    print(float.min);
-}

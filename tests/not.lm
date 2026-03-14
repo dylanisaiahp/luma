@@ -1,9 +1,0 @@
-void main() {
-    bool done = false;
-
-    if not done {
-        print("Not done!");
-    } else {
-        print("Done!");
-    }
-}

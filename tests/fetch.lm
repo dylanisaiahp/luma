@@ -1,4 +1,0 @@
-void main() {
-    string result = fetch("https://httpbin.org/get").get();
-    print(result);
-}
