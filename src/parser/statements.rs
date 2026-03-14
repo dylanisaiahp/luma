@@ -26,6 +26,7 @@ impl Parser {
             | Some(TokenKind::Char)
             | Some(TokenKind::Word)
             | Some(TokenKind::Maybe)
+            | Some(TokenKind::Worry)
             | Some(TokenKind::List)
             | Some(TokenKind::Table) => self.parse_variable_declaration(),
             // Struct variable declaration: Point p = ...

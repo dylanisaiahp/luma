@@ -129,6 +129,7 @@ impl Interpreter {
                 }
                 "write" => builtins::eval_write(args, self, expr.line, expr.column),
                 "random" => builtins::eval_random(args, self, expr.line, expr.column),
+                "run" => builtins::eval_run(args, self, expr.line, expr.column),
                 _ => {
                     if self.functions.contains_key(name.as_str()) {
                         let args_cloned = args.clone();

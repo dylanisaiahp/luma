@@ -315,8 +315,76 @@ impl Interpreter {
         else_arm: &Option<Vec<Stmt>>,
     ) -> Result<Value, RuntimeError> {
         let match_val = self.evaluate_expression(value)?;
-        let mut matched = false;
 
+        // List match — iterate each element, fire every arm that matches.
+        // Wildcard fires once only if nothing matched at all.
+        if let Value::List(items) = &match_val {
+            let items = items.clone();
+            let mut any_matched = false;
+            let mut unmatched: Vec<String> = Vec::new();
+
+            for item in &items {
+                let mut item_matched = false;
+                for arm in arms {
+                    if matches!(arm.pattern, MatchPattern::Wildcard) {
+                        continue; // skip wildcard on per-item pass
+                    }
+                    if self.pattern_matches(&arm.pattern, item) {
+                        self.push_scope();
+                        for stmt in &arm.body {
+                            self.execute_statement(stmt)?;
+                        }
+                        self.pop_scope();
+                        item_matched = true;
+                        any_matched = true;
+                    }
+                }
+                if !item_matched {
+                    unmatched.push(self.value_to_display_string(item));
+                }
+            }
+
+            // Wildcard / else — fires once if nothing matched at all
+            if !any_matched {
+                if let Some(else_body) = else_arm {
+                    self.push_scope();
+                    for stmt in else_body {
+                        self.execute_statement(stmt)?;
+                    }
+                    self.pop_scope();
+                } else {
+                    // Check for explicit wildcard arm
+                    for arm in arms {
+                        if matches!(arm.pattern, MatchPattern::Wildcard) {
+                            self.push_scope();
+                            for stmt in &arm.body {
+                                self.execute_statement(stmt)?;
+                            }
+                            self.pop_scope();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Always hint about unmatched items regardless of whether something else matched
+            if !unmatched.is_empty() {
+                eprintln!(
+                    "[?] {} item(s) did not match any pattern: {}",
+                    unmatched.len(),
+                    unmatched
+                        .iter()
+                        .map(|s| format!("\"{}\"", s))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+
+            return Ok(Value::Void);
+        }
+
+        // Scalar match — original behaviour, first match wins
+        let mut matched = false;
         for arm in arms {
             let is_match = self.pattern_matches(&arm.pattern, &match_val);
             if is_match {

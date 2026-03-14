@@ -140,3 +140,67 @@ pub fn eval_file(
         }),
     }
 }
+
+pub fn eval_run(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<crate::interpreter::value::Value, crate::interpreter::value::RuntimeError> {
+    use crate::interpreter::value::{RuntimeError, Value};
+
+    if args.is_empty() {
+        return Err(RuntimeError {
+            message: "run() requires at least one argument".to_string(),
+            line,
+            column,
+        });
+    }
+
+    // Evaluate all args as strings and join into a command
+    let mut parts: Vec<String> = Vec::new();
+    for arg in args {
+        let val = interpreter.evaluate_expression(arg)?;
+        match val {
+            Value::String(s) => {
+                // Split on whitespace so run("git status") works naturally
+                parts.extend(s.split_whitespace().map(|s| s.to_string()));
+            }
+            other => parts.push(interpreter.value_to_display_string(&other)),
+        }
+    }
+
+    let (cmd, cmd_args) = match parts.split_first() {
+        Some((c, a)) => (c.clone(), a.to_vec()),
+        None => {
+            return Err(RuntimeError {
+                message: "run() command cannot be empty".to_string(),
+                line,
+                column,
+            });
+        }
+    };
+
+    match std::process::Command::new(&cmd).args(&cmd_args).output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+            if output.status.success() {
+                Ok(Value::String(stdout))
+            } else {
+                let msg = if stderr.is_empty() { stdout } else { stderr };
+                Err(RuntimeError {
+                    message: format!("__raise__{}", msg),
+                    line,
+                    column,
+                })
+            }
+        }
+        Err(e) => Err(RuntimeError {
+            message: format!("__raise__run(\"{}\") failed: {}", cmd, e),
+            line,
+            column,
+        }),
+    }
+}

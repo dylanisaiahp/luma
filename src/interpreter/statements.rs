@@ -148,6 +148,8 @@ impl Interpreter {
             // maybe — auto-wrap non-maybe values
             (t, Value::Maybe(inner)) if t.starts_with("maybe") => Value::Maybe(inner),
             (t, v) if t.starts_with("maybe") => Value::Maybe(Some(Box::new(v))),
+            // worry — error case handled above via __raise__, success just passes value through
+            (t, v) if t.starts_with("worry") => v,
             // list
             (t, Value::List(items)) if t.starts_with("list") => Value::List(items),
             (t, Value::Maybe(None)) if t.starts_with("list") => Value::List(Vec::new()),
