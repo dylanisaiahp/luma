@@ -29,6 +29,7 @@ This document tracks what has been built and what's coming. Luma is in active ea
 - ✅ While loops, for loops with `range()`, for-in loops
 - ✅ Break statement
 - ✅ Match statements (integer, range, wildcard, string, set patterns)
+- ✅ Match on `list(string)` — iterates, fires all matches
 - ✅ User-defined functions with typed params and return values
 - ✅ `void` function enforcement
 - ✅ String interpolation (`&{var}`)
@@ -36,27 +37,57 @@ This document tracks what has been built and what's coming. Luma is in active ea
 - ✅ Logical operators (`&&`, `||`, `not`)
 - ✅ Error handling: `worry(T)`, `raise`, `else error { }`
 - ✅ Structs with fields and methods
-- ✅ Multi-file projects: `use module;`, `module name;`
+- ✅ Recursion (scope leak fix — if/while/for/for-in all correct)
+- ✅ Multi-file projects: `use module;`, `module name;`, `use X as Y` (pending)
 - ✅ `luma.toml` — project config with `[project]` and `entry`
 - ✅ `luma run` — runs from `luma.toml` entry if no file given
 - ✅ `luma new` — scaffolds project with `source/`, `luma.toml`, `README.md`
+- ✅ `run()` — shell command execution, returns `worry(string)`
 - ✅ Built-in functions: `print`, `write`, `read`, `input`, `int`, `float`, `string`, `random`
 - ✅ `fetch(url)` — HTTP GET requests
-- ✅ `file(path)` — file read/write/append
+- ✅ `file(path)` — file read/write/append/exists
 - ✅ Rich error and warning system with common-mistake hints
 - ✅ CLI: `run`, `check`, `new`, `--time`, `--debug`
+- ✅ Reorganized test suite (`tests/types`, `collections`, `control`, `functions`, `io`, `errors`, `structs`)
 
-### Remaining
+### Remaining (before rewrite)
 
-- 🔲 `run()` — execute a string of Luma code at runtime
-- 🔲 `input()` redesign
-- 🔲 `luma add` — add a dependency
-- 🔲 `luma build` — compile to binary via Rust codegen
-- 🔲 Module conflict error (`http.lm` + `http/` both exist)
-- 🔲 `use http.client` single import (no parens needed)
+#### Language features
+- 🔲 `for c in string` — character iteration
+- 🔲 `list(string).join(separator)` — needed for codegen
+- 🔲 `file().files()` / `file().dirs()` — directory traversal, replaces `dir()`
+- 🔲 `cli_args()`, `cli_flags()`, `cli_opts()` — replaces `input()` redesign
 - 🔲 `use X as Y` — import aliasing
 - 🔲 Generics: `generic` keyword for functions and structs
-- 🔲 Install script
+- 🔲 Module conflict error (`http.lm` + `http/` both exist)
+- 🔲 `use http.client` single import fix (already partially done)
+
+#### Comment system expansion
+- 🔲 `#` — regular comment (done)
+- 🔲 `#!` — critical/error comment
+- 🔲 `#?` — warning/uncertainty comment
+- 🔲 `#>` — action needed (todo, fix)
+- 🔲 `#T expected output: value` — test annotation
+- 🔲 `#T expected error: message` — test annotation
+
+#### CLI (v1 — Rust)
+- 🔲 `luma build` — compile to binary via Rust codegen (v1 compiler)
+- 🔲 `luma new` — add git init + .gitignore
+
+#### Error + debug system (major improvement for rewrite)
+- 🔲 No generic errors — every error specific, with span, hint, code
+- 🔲 `luma debug` as own command (not a flag) with multiple levels
+- 🔲 Level 1: errors only
+- 🔲 Level 2: errors + warnings
+- 🔲 Level 3: + scope changes
+- 🔲 Level 4: + every expression evaluated
+- 🔲 Level 5: everything — tokens, AST, scope push/pop, variable lookups, calls
+- 🔲 Never need `eprintln!` for debugging again
+
+#### v1 Compiler (Rust, inside current repo)
+- 🔲 AST → Rust codegen
+- 🔲 `luma build` produces native binary
+- 🔲 Spans propagate through all phases
 
 ---
 
@@ -64,10 +95,58 @@ This document tracks what has been built and what's coming. Luma is in active ea
 
 Luma compiles itself. The Rust interpreter is retired.
 
-- `luma-core` — core language in Luma
-- `luma-comp` — compiler in Luma (`lumac`)
-- `luma-cli` — CLI in Luma
-- `luma-lsp` — language server in Luma
+### Architecture
+```
+luma-core  → lexer, parser, AST, analysis, diagnostics
+luma-comp  → codegen (AST → Rust), loads luma-core
+luma-cli   → CLI orchestration, loads luma-comp
+luma-lsp   → language server, loads luma-core
+```
+
+### Dependency graph
+```
+luma-core
+   ↑      ↑
+luma-comp  luma-lsp
+   ↑
+luma-cli
+```
+
+### Pipeline
+```
+.lm source
+  ↓ lexer (tokens with spans)
+  ↓ parser (immutable AST)
+  ↓ analysis (type check, resolve)
+  ↓ codegen (Rust source)
+  ↓ run("rustc ...")
+  ↓ binary
+```
+
+### v2 CLI (post-rewrite)
+```
+luma new        ← scaffold project (git init, .gitignore, source/, luma.toml)
+luma init       ← initialize existing directory as Luma project
+luma run        ← interpret file or project
+luma build      ← compile to native binary
+luma check      ← parse + type check, no execution
+luma debug      ← debug with levels (1-5)
+luma test       ← run #T annotations, compare output
+luma tidy       ← format + lint (fmt + clippy equivalent)
+luma add        ← add dependency to luma.toml
+luma remove     ← remove dependency
+luma update     ← update Luma or dependencies
+luma info       ← show project/dependency info
+luma search     ← search package registry (post-website)
+luma install    ← install Luma components e.g. LSP (post-website)
+```
+
+### Key design principles
+- AST is immutable once built — transformations create new nodes
+- Strict phase separation — no phase calls into a later phase
+- Spans everywhere — every token, AST node, and error has line/col
+- No generic errors — every diagnostic is specific and actionable
+- Debug system is first-class, not bolted on
 
 ---
 
@@ -79,6 +158,7 @@ Luma compiles itself. The Rust interpreter is retired.
 - `luma add github.com/user/pkg` — auto-detects git/local/network
 - Package naming convention: `name-lm` (repo), `name.lm` (import)
 - Dependency sources: `{ git = }`, `{ path = }`, `{ network = }`
+- `luma-converter` — `luma convert file.rs/.py/.go` (mini compiler, no binary)
 
 ---
 
@@ -97,6 +177,7 @@ Luma compiles itself. The Rust interpreter is retired.
 - Standard library modules (`math`, `io`, etc.)
 - Generic structs
 - Interfaces / implementing (`: Interface` syntax)
-- `luma-lsp` — language server for editor support
-- Website + docs
+- Website + docs (luma-lang.io?)
 - More string and collection methods
+- IR layer (post-rewrite, sits between AST and codegen)
+- `luma search` / `luma install` (post-website)
