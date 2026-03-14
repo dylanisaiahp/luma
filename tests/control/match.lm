@@ -1,0 +1,58 @@
+struct Point {
+    int x;
+    int y;
+    int sum() {
+        return x + y;
+    }
+}
+
+void main() {
+    # integer match
+    int val = 3;
+    match val {
+        1:
+            print("one");
+        range(2, 5):
+            print("Good Try!");
+        _:
+            print("other");
+    }
+
+    # string match
+    string cmd = "help";
+    match cmd {
+        "help":
+            print("showing help");
+        ("quit", "exit", "q"):
+            print("goodbye");
+        else:
+            print("unknown command");
+    }
+
+    string lang = "luma";
+    match lang {
+        ("rust", "luma"):
+            print("good choice");
+        "python":
+            print("not bad");
+        else:
+            print("never heard of it");
+    }
+
+    # list match
+    list(string) flags = ("verbose", "time");
+    match flags {
+        ("verbose", "v"):
+            print("verbose on");
+        ("time", "t"):
+            print("time on");
+        _:
+            print("unknown flag");
+    }
+
+    # struct in match context
+    Point p = Point(x: 3, y: 7);
+    print(p.x);
+    print(p.y);
+    print(p.sum());
+}

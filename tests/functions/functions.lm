@@ -1,0 +1,43 @@
+string greet(string name) {
+    return "Hello, &{name}";
+}
+
+int add(int x, int y) {
+    return x + y;
+}
+
+bool is_even(int n) {
+    return n % 2 == 0;
+}
+
+void announce(string msg) {
+    print(msg);
+}
+
+list(int) range_list(int n) {
+    list(int) result = ();
+    for i in range(0, n) {
+        result = result.add(i);
+    }
+    return result;
+}
+
+void bad() {
+    return 42;
+}
+
+void main() {
+    print(greet("Dylan"));
+    print(add(3, 4));
+    print(is_even(4));
+    print(is_even(7));
+    announce("Luma!");
+
+    list(int) nums = range_list(4);
+    print(nums.len());
+    print(nums.get(0));
+    print(nums.get(3));
+
+    # void enforcement
+    bad();
+}

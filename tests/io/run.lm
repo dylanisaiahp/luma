@@ -1,0 +1,39 @@
+void main() {
+    # basic command
+    string result = run("echo hello") else e {
+        print("failed: &{e}");
+        return;
+    }
+    print(result);
+
+    # multi-arg command
+    string files = run("ls", "tests/") else e {
+        print("failed: &{e}");
+        return;
+    }
+    print(files);
+
+    # error handling — catches and continues
+    string _bad = run("cat nonexistent_file.txt") else e {
+        print("caught: &{e}");
+    }
+
+    # list match
+    list(string) flags = ("verbose", "time");
+    match flags {
+        ("verbose", "v"):
+            print("verbose on");
+        ("time", "t"):
+            print("time on");
+        _:
+            print("unknown flag");
+    }
+
+    list(string) no_flags = ();
+    match no_flags {
+        ("verbose", "v"):
+            print("verbose on");
+        _:
+            print("nothing passed");
+    }
+}

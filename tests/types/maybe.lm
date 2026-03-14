@@ -1,0 +1,27 @@
+maybe(string) find_name(bool exists) {
+    if exists {
+        return "Dylan";
+    }
+    return empty;
+}
+
+void main() {
+    maybe(string) name = find_name(true);
+    print(name.exists());
+    print(name.or("Guest"));
+
+    maybe(string) missing = find_name(false);
+    print(missing.exists());
+    print(missing.or("Guest"));
+
+    maybe(int) num = empty;
+    print(num.or(0));
+
+    # unwrap then call method
+    maybe(string) found = find_name(true);
+    string val = found.or("");
+    print(val.upper());
+
+    maybe(string) quiet = find_name(false);
+    print(quiet.or("HELLO"));
+}

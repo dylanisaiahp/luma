@@ -1,0 +1,20 @@
+worry(int) safe_divide(int a, int b) {
+    if b == 0 {
+        raise "cannot divide by zero";
+    }
+    return a / b;
+}
+
+void main() {
+    # success case
+    int result = safe_divide(10, 2) else e {
+        print("error: &{e}");
+        return;
+    }
+    print(result);
+
+    # error case
+    int _bad = safe_divide(10, 0) else e {
+        print(e);
+    }
+}

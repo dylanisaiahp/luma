@@ -1,0 +1,60 @@
+list(int) double_all(list(int) nums) {
+    list(int) result = ();
+    for n in nums {
+        result = result.add(n * 2);
+    }
+    return result;
+}
+
+list(string) names_from_scores(list(int) scores) {
+    list(string) result = ();
+    if scores.contains(95) {
+        result = result.add("Alice");
+    }
+    if scores.contains(87) {
+        result = result.add("Bob");
+    }
+    if scores.contains(92) {
+        result = result.add("Carol");
+    }
+    return result;
+}
+
+void main() {
+    list(int) nums = (1, 2, 3, 4, 5);
+    print(nums.len());
+    print(nums.get(0));
+    print(nums.contains(3));
+    print(nums.len());
+
+    list(string) words = ("luma", "is", "great");
+    print(words.get(0));
+    print(words.len());
+
+    list(int) sorted = (5, 4, 3, 2, 1);
+    print(sorted.reverse());
+
+    list(int) grown = nums.add(100);
+    print(grown.get(5));
+    print(grown.contains(100));
+
+    # for-in
+    list(int) small = (1, 2, 3);
+    for n in small {
+        print(n);
+    }
+
+    # return list from function
+    list(int) doubled = double_all((10, 20, 30));
+    print(doubled.get(0));
+    print(doubled.get(1));
+    print(doubled.get(2));
+
+    list(int) scores = (95, 87, 92);
+    list(string) names = names_from_scores(scores);
+    print(names.get(0));
+    print(names.get(1));
+    print(names.get(2));
+
+    print("all list tests passed!");
+}

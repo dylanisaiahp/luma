@@ -1,0 +1,10 @@
+void main() {
+    # print adds newline
+    print("before");
+    print("after");
+
+    # write does not add newline
+    write("User: ");
+    write("Dylan");
+    write("\n");
+}

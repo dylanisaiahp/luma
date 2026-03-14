@@ -1,0 +1,48 @@
+void main() {
+    # int
+    int x = 42;
+    print(x);
+    int neg = -7;
+    print(neg);
+    x += 1;
+    print(x);
+    x -= 3;
+    print(x);
+    x *= 2;
+    print(x);
+    x /= 5;
+    print(x);
+    print(x % 3);
+
+    # float
+    float pi = 3.14;
+    print(pi);
+    float neg_f = -2.5;
+    print(neg_f);
+
+    # bool
+    bool done = false;
+    print(done);
+    done = true;
+    print(done);
+    print(true && false);
+    print(true || false);
+    print(not true);
+
+    # string
+    string name = "Luma";
+    print(name);
+    print(name.upper());
+    print(name.len());
+    print(name.contains("uma"));
+    string greeting = "Hello, &{name}!";
+    print(greeting);
+
+    # char
+    char c = 'a';
+    print(c);
+
+    # word
+    word tag = 'hello';
+    print(tag);
+}

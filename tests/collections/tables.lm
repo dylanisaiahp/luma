@@ -1,0 +1,33 @@
+table(string, int) merge_scores(table(string, int) a, table(string, int) b) {
+    table(string, int) result = a;
+    result = result.set("Carol", b.get("Carol"));
+    return result;
+}
+
+void main() {
+    table(string, int) scores = ("Alice": 95, "Bob": 87);
+    print(scores.len());
+    print(scores.get("Alice"));
+    print(scores.has("Bob"));
+    print(scores.has("Carol"));
+
+    scores = scores.set("Carol", 92);
+    print(scores.len());
+    print(scores.get("Carol"));
+
+    # for-in table
+    table(string, int) small = ("x": 1, "y": 2);
+    for (key, val) in small {
+        print(key);
+        print(val);
+    }
+
+    # return table from function
+    table(string, int) a = ("Alice": 95, "Bob": 87);
+    table(string, int) b = ("Carol": 92);
+    table(string, int) merged = merge_scores(a, b);
+    print(merged.get("Alice"));
+    print(merged.get("Carol"));
+
+    print("all table tests passed!");
+}

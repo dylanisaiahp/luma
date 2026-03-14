@@ -1,0 +1,46 @@
+struct Point {
+    int x;
+    int y;
+
+    int sum() {
+        return x + y;
+    }
+}
+
+struct Person {
+    string name;
+    int age;
+    bool active;
+
+    string greet() {
+        return "Hi, I am &{name}";
+    }
+}
+
+struct Counter {
+    int value;
+
+    int next(int step) {
+        return value + step;
+    }
+}
+
+void main() {
+    # basic fields and methods
+    Point p = Point(x: 3, y: 7);
+    print(p.x);
+    print(p.y);
+    print(p.sum());
+
+    # string/bool fields
+    Person bob = Person(name: "Bob", age: 30, active: true);
+    print(bob.name);
+    print(bob.age);
+    print(bob.active);
+    print(bob.greet());
+
+    # method with param
+    Counter c = Counter(value: 10);
+    print(c.next(5));
+    print(c.next(1));
+}

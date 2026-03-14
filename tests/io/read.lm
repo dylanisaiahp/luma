@@ -1,0 +1,4 @@
+void main() {
+    string line = read();
+    print(line);
+}

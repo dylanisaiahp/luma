@@ -1,0 +1,60 @@
+void main() {
+    # if / else if / else
+    int x = 8;
+    if x > 10 {
+        print("big");
+    } else if x > 5 {
+        print("medium");
+    } else {
+        print("small");
+    }
+
+    # while
+    int i = 0;
+    while i < 3 {
+        print(i);
+        i += 1;
+    }
+
+    # for range
+    for n in range(1, 6) {
+        print(n);
+    }
+
+    # for-in list
+    list(string) items = ("a", "b", "c");
+    for item in items {
+        print(item);
+    }
+
+    # break
+    int j = 0;
+    while true {
+        if j == 3 {
+            break;
+        }
+        j += 1;
+    }
+    print(j);
+
+    # scope
+    int outer = 99;
+    if true {
+        int inner = 42;
+        print(outer);
+        print(inner);
+    }
+    print(outer);
+
+    # logical operators
+    bool a = true;
+    bool b = false;
+    print(a && b);
+    print(a || b);
+    print(not a);
+
+    # modulo
+    print(10 % 3);
+    print(-42 % 5);
+    print(2.5 % 1.5);
+}

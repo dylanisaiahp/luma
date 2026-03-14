@@ -1,0 +1,9 @@
+# This file tests that Luma reports errors correctly.
+# It is expected to produce errors, not run successfully.
+
+void main() {
+    // This is a comment in the wrong style
+
+    int x = 5;
+    int y == 5;
+}
