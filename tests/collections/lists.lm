@@ -56,5 +56,14 @@ void main() {
     print(names.get(1));
     print(names.get(2));
 
+    # merge
+    list(string) parts = ("Hello", "Luma", "World");
+    print(parts.merge(" "));
+    print(parts.merge(", "));
+    print(parts.merge(""));
+
+    list(string) lines = ("fn main() {", "    print(42);", "}");
+    print(lines.merge("\n"));
+
     print("all list tests passed!");
 }

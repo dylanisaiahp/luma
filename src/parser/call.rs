@@ -215,6 +215,8 @@ fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
         TokenKind::Word => Some("word".to_string()),
         TokenKind::In => Some("in".to_string()),
         TokenKind::Not => Some("not".to_string()),
+        TokenKind::List => Some("list".to_string()),
+        TokenKind::Table => Some("table".to_string()),
         _ => None,
     }
 }

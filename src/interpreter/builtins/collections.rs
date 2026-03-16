@@ -111,6 +111,33 @@ pub fn list_method(
                 column,
             }),
         },
+        "merge" => {
+            let glue = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Char(c)) => c.to_string(),
+                None => String::new(),
+                _ => {
+                    return Err(RuntimeError {
+                        message: "list.merge() takes a string separator argument".to_string(),
+                        line,
+                        column,
+                    });
+                }
+            };
+            let parts: Vec<String> = items
+                .iter()
+                .map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    Value::Char(c) => c.to_string(),
+                    Value::Word(w) => w.clone(),
+                    Value::Integer(n) => n.to_string(),
+                    Value::Float(f) => f.to_string(),
+                    Value::Boolean(b) => b.to_string(),
+                    _ => String::new(),
+                })
+                .collect();
+            Ok(Value::String(parts.join(&glue)))
+        }
         _ => Err(RuntimeError {
             message: format!("list has no method '{}'", method),
             line,

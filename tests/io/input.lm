@@ -1,0 +1,18 @@
+# tests/io/input.lm
+# Run with: luma run tests/io/input.lm --verbose --output file.txt hello world
+void main() {
+    list(string) args = input().args();
+    list(string) flags = input().flags();
+    table(string, string) opts = input().options();
+
+    print(args.len());
+    print(flags.len());
+
+    for a in args {
+        print(a);
+    }
+
+    for f in flags {
+        print(f);
+    }
+}

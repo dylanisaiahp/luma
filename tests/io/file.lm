@@ -12,4 +12,22 @@ void main() {
     file("tests/io/test_output.txt").append(" More text!");
     string appended = file("tests/io/test_output.txt").read();
     print(appended);
+
+    string fname = "file.lm";
+    string txtname = "test_output.txt";
+
+    # list — all files in tests/io/
+    list(string) all = file("tests/io/").list(".");
+    print(all.contains(fname));
+    print(all.contains("run.lm"));
+
+    # list — only .lm files
+    list(string) lm_files = file("tests/io/").list(".lm");
+    print(lm_files.contains(fname));
+    print(lm_files.contains(txtname));
+
+    # list — only dirs in tests/
+    list(string) dirs = file("tests/").list("/");
+    print(dirs.contains("io"));
+    print(dirs.contains("types"));
 }

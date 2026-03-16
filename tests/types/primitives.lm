@@ -38,9 +38,16 @@ void main() {
     string greeting = "Hello, &{name}!";
     print(greeting);
 
+    # chars
+    list(char) letters = "hello".chars();
+    print(letters.len());
+    for c in letters {
+        print(c);
+    }
+
     # char
-    char c = 'a';
-    print(c);
+    char ch = 'a';
+    print(ch);
 
     # word
     word tag = 'hello';

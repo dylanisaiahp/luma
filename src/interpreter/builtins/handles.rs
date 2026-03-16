@@ -76,46 +76,69 @@ pub fn fetch_method(
 
 pub fn input_method(
     method: &str,
-    args: &[Value],
+    _args: &[Value],
     line: usize,
     column: usize,
 ) -> Result<Value, RuntimeError> {
+    // Get raw CLI args (skip: program name, "run", file path)
+    let raw: Vec<String> = std::env::args().skip(3).collect();
+
     match method {
-        "flag" => match args.first() {
-            Some(Value::String(flag_name)) => {
-                let cli_args: Vec<String> = std::env::args().skip(3).collect();
-                let long = format!("--{}", flag_name);
-                let short = format!("-{}", &flag_name[..1]);
-                Ok(Value::Boolean(
-                    cli_args.iter().any(|a| a == &long || a == &short),
-                ))
-            }
-            _ => Err(RuntimeError {
-                message: "input().flag() takes one string argument".to_string(),
-                line,
-                column,
-            }),
-        },
-        "option" => match args.first() {
-            Some(Value::String(opt_name)) => {
-                let cli_args: Vec<String> = std::env::args().skip(3).collect();
-                let long = format!("--{}", opt_name);
-                let short = format!("-{}", &opt_name[..1]);
-                let mut found = None;
-                for (i, arg) in cli_args.iter().enumerate() {
-                    if arg == &long || arg == &short {
-                        found = cli_args.get(i + 1).cloned();
-                        break;
+        // Positional args — everything that doesn't start with -
+        "args" => {
+            let positional: Vec<Value> = raw
+                .iter()
+                .filter(|a| !a.starts_with('-'))
+                .map(|a| Value::String(a.clone()))
+                .collect();
+            Ok(Value::List(positional))
+        }
+        // Flags — args starting with - or --, strip the dashes, no value after
+        "flags" => {
+            let mut flags: Vec<Value> = Vec::new();
+            let mut i = 0;
+            while i < raw.len() {
+                let arg = &raw[i];
+                if arg.starts_with("--") {
+                    // Check if next arg is a value (not a flag)
+                    let next_is_value =
+                        raw.get(i + 1).map(|n| !n.starts_with('-')).unwrap_or(false);
+                    if !next_is_value {
+                        flags.push(Value::String(arg.trim_start_matches('-').to_string()));
                     }
+                    i += if next_is_value { 2 } else { 1 };
+                } else if arg.starts_with('-') {
+                    let next_is_value =
+                        raw.get(i + 1).map(|n| !n.starts_with('-')).unwrap_or(false);
+                    if !next_is_value {
+                        flags.push(Value::String(arg.trim_start_matches('-').to_string()));
+                    }
+                    i += if next_is_value { 2 } else { 1 };
+                } else {
+                    i += 1;
                 }
-                Ok(Value::String(found.unwrap_or_default()))
             }
-            _ => Err(RuntimeError {
-                message: "input().option() takes one string argument".to_string(),
-                line,
-                column,
-            }),
-        },
+            Ok(Value::List(flags))
+        }
+        // Options — flags that have a value after them, returned as table(string, string)
+        "options" => {
+            let mut opts: Vec<(Value, Value)> = Vec::new();
+            let mut i = 0;
+            while i < raw.len() {
+                let arg = &raw[i];
+                if arg.starts_with('-')
+                    && let Some(next) = raw.get(i + 1)
+                    && !next.starts_with('-')
+                {
+                    let key = arg.trim_start_matches('-').to_string();
+                    opts.push((Value::String(key), Value::String(next.clone())));
+                    i += 2;
+                    continue;
+                }
+                i += 1;
+            }
+            Ok(Value::Table(opts))
+        }
         _ => Err(RuntimeError {
             message: format!("input() has no method '{}'", method),
             line,
@@ -193,6 +216,75 @@ pub fn file_method(
             }
         }
         "exists" => Ok(Value::Boolean(std::path::Path::new(path).exists())),
+        "list" => {
+            let filter = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                None => String::new(),
+                _ => {
+                    return Err(RuntimeError {
+                        message: "file.list() takes an optional string filter".to_string(),
+                        line,
+                        column,
+                    });
+                }
+            };
+            let dir_path = std::path::Path::new(path);
+            let entries = std::fs::read_dir(dir_path).map_err(|e| RuntimeError {
+                message: format!("file(\"{}\").list() failed: {}", path, e),
+                line,
+                column,
+            })?;
+            let mut results: Vec<Value> = Vec::new();
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                let name = entry_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let is_dir = entry_path.is_dir();
+                let matches = match filter.as_str() {
+                    "" => true,
+                    "." => !is_dir, // all files
+                    "/" => is_dir,  // all dirs
+                    ext if ext.starts_with('.') => {
+                        // by extension
+                        !is_dir && name.ends_with(ext)
+                    }
+                    subdir if subdir.starts_with('/') && subdir.ends_with('/') => {
+                        // /dirname/ — list contents of subdirectory
+                        let sub = subdir.trim_matches('/');
+                        let sub_path = dir_path.join(sub);
+                        if sub_path.is_dir() {
+                            let sub_entries =
+                                std::fs::read_dir(&sub_path).map_err(|e| RuntimeError {
+                                    message: format!(
+                                        "file(\"{}\").list() failed on subdir: {}",
+                                        path, e
+                                    ),
+                                    line,
+                                    column,
+                                })?;
+                            for sub_entry in sub_entries.flatten() {
+                                let sub_name = sub_entry
+                                    .path()
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                results.push(Value::String(sub_name));
+                            }
+                        }
+                        false // already handled above
+                    }
+                    _ => false,
+                };
+                if matches {
+                    results.push(Value::String(name));
+                }
+            }
+            Ok(Value::List(results))
+        }
         _ => Err(RuntimeError {
             message: format!("file() has no method '{}'", method),
             line,
