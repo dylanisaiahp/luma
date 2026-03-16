@@ -353,9 +353,29 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     let readme = format!("# {}\n\nA Luma project.\n", name);
     fs::write(path.join("README.md"), readme)?;
 
-    println!("[✓] Created new Luma project: {}", name);
-    println!("    cd {}", name);
-    println!("    luma run");
+    let gitignore = "# Luma build output\n.luma/\n\n# OS\n.DS_Store\nThumbs.db\n";
+    fs::write(path.join(".gitignore"), gitignore)?;
+
+    // Initialize git repository
+    let git_result = std::process::Command::new("git")
+        .arg("init")
+        .current_dir(path)
+        .output();
+
+    match git_result {
+        Ok(output) if output.status.success() => {
+            println!("[✓] Created new Luma project: {}", name);
+            println!("    cd {}", name);
+            println!("    luma run");
+            println!("    git initialized");
+        }
+        _ => {
+            println!("[✓] Created new Luma project: {}", name);
+            println!("    cd {}", name);
+            println!("    luma run");
+            println!("    [!] git init failed — is git installed?");
+        }
+    }
 
     Ok(())
 }
