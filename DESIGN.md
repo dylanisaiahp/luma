@@ -14,6 +14,20 @@ This document captures the core design decisions and principles for the Luma rew
 
 ---
 
+## Locked Decisions (finalized in a0.1 cleanup)
+
+These are not up for discussion in the rewrite — they are locked.
+
+- `word` type removed — use `string` or `char`
+- `_` wildcard removed from match — use `else` only
+- `()` no longer valid for empty list/table init — use `empty` keyword only
+- Module system: every importable `.lm` file must declare `module name;` — no filename fallback, module name CAN match filename
+- `luma new --file name` creates a `.lm` file pre-populated with `module name;`
+- `else` is the only match wildcard — patterns are: integer, range, string, set, else
+- Single-quote literals produce `char` only
+
+---
+
 ## Variable System
 
 Luma has three tiers of variables:
@@ -72,11 +86,181 @@ if x > 10 {
     result = 1
 }
 
-print(result)   # ERR: result may not be initialized on all paths
+print(result)   # Err:Uninit-Var — result may not be initialized on all paths
 ```
 
 ### Rule 3 — Must be used
 Variables, functions, imports, and constants must be used or the compiler warns. The `_` prefix suppresses the warning.
+
+---
+
+## Types
+
+```luma
+int           # 64-bit signed integer
+float         # 64-bit float
+string        # UTF-8 text
+bool          # true / false
+char          # single Unicode character, single-quote literal 'a'
+maybe(T)      # optional value — .exists() / .or(fallback)
+worry(T)      # failable value — raise / else error { }
+list(T)       # ordered collection
+table(K, V)   # key-value collection
+```
+
+`maybe(T)?` shorthand is planned post-rewrite but not in a0.1.
+
+### Collections
+
+- `list(T)` — immutable by default. `.add()` returns a new list, it does not mutate in place.
+- `table(K, V)` — same immutability model. More methods in rewrite.
+- `empty` — the only way to initialize an empty list or table. `()` is not valid.
+
+---
+
+## Method APIs
+
+### String / Char
+
+`.len()` `.upper()` `.lower()` `.trim()` `.reverse()` `.chars()` `.contains()` `.starts_with()` `.ends_with()` `.repeat()` `.replace()` `.split()` `.first()` `.last()` `.as(type)` `.exists()`
+
+### List
+
+`.len()` `.get(i)` `.contains()` `.where()` `.add()` `.remove(i)` `.reverse()` `.sort()` `.first()` `.last()` `.merge(glue)` `.exists()`
+
+### Table
+
+`.len()` `.get(key)` `.has(key)` `.set(key, val)` `.remove(key)` `.keys()` `.values()` `.exists()`
+
+### input()
+
+```luma
+list(string) args  = input().args();
+list(string) flags = input().flags();
+table(string, string) opts = input().options();
+```
+
+### file()
+
+```luma
+file("path").read()
+file("path").write("content")
+file("path").append("content")
+file("path").exists()
+file("path/").list(".")       # all files
+file("path/").list(".lm")     # by extension
+file("path/").list("/")       # dirs only
+file("path/").list("/sub/")   # subdir contents
+```
+
+### fetch()
+
+```luma
+fetch("https://...").get()
+fetch("https://...").send("body")
+```
+
+---
+
+## Error and Warning System
+
+### Design goals
+
+The error system in a0.1 was a foundation. The rewrite replaces it completely with these goals:
+
+- **No generic errors** — every diagnostic has a specific code, message, span, and actionable hint. A fallback "something went wrong" message will not exist.
+- **Cross-file diagnostics** — errors must show the correct file, line, and column regardless of which file in the module chain triggered them. The current a0.1 implementation can fail silently, point at a `use` statement rather than the actual error site, or produce a Rust backtrace. None of these are acceptable.
+- **Every error is recoverable** — the compiler collects all errors before reporting, never stops at the first one.
+- **Errors and warnings always surface** — on every `luma` command, not just `luma check`.
+- **Hints are prescriptive** — they tell the programmer exactly what to change, not just what went wrong.
+
+### Diagnostic codes
+
+Codes use an `Err:` or `Warn:` prefix followed by a short title-case slug. This keeps them self-documenting without being verbose, and title case means Luma is talking to you, not shouting.
+
+```
+[Err:Type-Mismatch]
+[Err:Undef-Var]
+[Err:Convert-Fail]
+[Err:Missing-Semi]
+[Err:Uninit-Var]
+[Err:Div-By-Zero]
+[Err:Unknown-Func]
+[Err:Wrong-Arg-Count]
+[Err:Not-A-Bool]
+[Err:Unterminated-String]
+[Warn:Unused-Var]
+[Warn:Unused-Import]
+[Warn:Unused-Func]
+[Warn:Void-Returns-Value]
+```
+
+The format is locked. The specific slugs are not — if a slug is unclear or gets complaints it can be renamed without touching diagnostic logic.
+
+### Diagnostic appearance
+
+Each diagnostic renders in layers with distinct colors, designed to feel calm and teacherly rather than alarming:
+
+```
+[Err:Type-Mismatch] Type mismatch: expected int, got string    ← pastel red
+   --> main.lm:3:9                                             ← cyan
+
+ 3 │   int x = "hello";                                        ← neutral/dimmed
+           ~~~~~~~
+           Use a string variable, or change the type to string. ← soft blue or muted green
+```
+
+```
+[Warn:Unused-Var] Unused variable: 'result'                    ← warm light yellow
+   --> main.lm:5:9                                             ← cyan
+
+ 5 │   int result = 0;                                         ← neutral/dimmed
+           ~~~~~~
+           If you meant to ignore it, prefix with underscore: _result ← soft blue or muted green
+```
+
+Color intent:
+- **Error label + message** — pastel red. Noticeable but not aggressive.
+- **Warning label + message** — warm light yellow. Informational, not urgent.
+- **File/location arrow** — cyan.
+- **Source line** — neutral, dimmed. Context, not the focus.
+- **Hint** — soft blue or muted green. Feels like a suggestion, not a command.
+
+The color scheme is the current direction, not a hard lock. The palette lives in one place in `luma-core/diagnostics` and can be adjusted without touching any diagnostic logic.
+
+### Diagnostic shape
+
+Every diagnostic carries:
+- Code — `Err:Slug` or `Warn:Slug`
+- Severity
+- Message — what went wrong, in plain language
+- Span — filename, line, column, length (always accurate, even across files)
+- Source line — the actual text at that location
+- Hint — what to do about it, prescriptive and specific
+
+### Cross-file requirement
+
+When a module is `use`d and contains an error, the diagnostic must point to the exact location in the module file — not to the `use` statement in the importing file. The `luma-core` diagnostics module owns all span tracking and must thread spans through the entire pipeline so that all errors always resolve to their true source location.
+
+### Always visible
+
+Errors and warnings surface on every `luma` command — they are not debug output.
+
+---
+
+## Debug System
+
+`luma debug` is its own command with 5 levels:
+
+- **Level 1** — errors only
+- **Level 2** — errors + warnings
+- **Level 3** — + scope changes, variable declarations
+- **Level 4** — + every expression evaluated, every function call with args/return
+- **Level 5** — everything: tokens, AST nodes, scope push/pop, every variable lookup
+
+Goal: never need to add a print statement to debug Luma code.
+
+The debug system must be cross-file aware — when tracing execution across module boundaries, the debug output shows which file each event came from.
 
 ---
 
@@ -123,38 +307,9 @@ luma-cli
 
 - **AST is immutable once built** — transformations create new nodes, never mutate
 - **Strict phase separation** — no phase calls into a later phase
-- **Spans everywhere** — every token, AST node, and error has line/col
+- **Spans everywhere** — every token, AST node, and error has file + line + col
 - **No generic errors** — every diagnostic is specific, with code, span, and hint
-
----
-
-## Error System
-
-### Error codes
-- `ERR-N` for errors
-- `WARN-N` for warnings
-- No leading zeros, no artificial ceiling
-- Every error has a unique code, specific message, span, and actionable hint
-
-### Levels (always visible)
-Errors and warnings surface on every `luma` command — they are not debug output.
-
-### No generic errors
-`ERR-16: something went wrong at runtime` will not exist in the rewrite. Every possible failure has a specific message.
-
----
-
-## Debug System
-
-`luma debug` is its own command with 5 levels:
-
-- **Level 1** — errors only
-- **Level 2** — errors + warnings
-- **Level 3** — + scope changes, variable declarations
-- **Level 4** — + every expression evaluated, every function call with args/return
-- **Level 5** — everything: tokens, AST nodes, scope push/pop, every variable lookup
-
-Goal: never need to add a print statement to debug Luma code.
+- **Cross-file correctness** — spans always resolve to the actual source file, never to an import site
 
 ---
 
@@ -162,10 +317,11 @@ Goal: never need to add a print statement to debug Luma code.
 
 ### v1 (Rust, current repo)
 ```
-luma new      ← scaffold project (source/, luma.toml, README, .gitignore, git init)
-luma run      ← interpret file or project
-luma build    ← compile to binary via Rust codegen
-luma check    ← parse + check, no execution
+luma new               ← done (git init + .gitignore + source/ + luma.toml + README)
+luma new --file name   ← done (creates name.lm with module name; declaration)
+luma run               ← done
+luma check             ← done
+luma build             ← TODO (v1 compiler: AST → Rust codegen → binary via rustc)
 ```
 
 ### v2 (post-rewrite, luma-cli in Luma)
@@ -204,8 +360,8 @@ safe_divide(10, 0);       #T expected error: cannot divide by zero
 ```luma
 #   regular comment
 #!  critical / error
-#?  warning / uncertainty  
-#>  action needed (todo, fix) — syntax TBD
+#?  warning / uncertainty
+#>  action needed (todo, fix)
 #T  test annotation
 ```
 
