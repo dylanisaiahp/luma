@@ -8,6 +8,8 @@ void main() {
 }
 ```
 
+> **Note:** This is the reference implementation (a0.1) — a Rust-based interpreter. A rewrite in Luma itself is planned for a0.2. This repo will be archived once the rewrite is complete.
+
 ---
 
 ## Why Luma?
@@ -22,9 +24,7 @@ Luma is for anyone who finds programming languages overwhelming. It won't surpri
 
 ### Install
 
-An interactive install script is coming soon. Watch this repo for updates.
-
-For now, clone and build with Cargo:
+Clone and build with Cargo:
 
 ```bash
 git clone https://github.com/dylanisaiahp/luma
@@ -36,12 +36,13 @@ cp target/release/luma ~/.local/bin/luma
 ### Usage
 
 ```bash
-luma new myproject     # Create a new project
-luma run               # Run from luma.toml entry point
-luma run main.lm       # Run a specific file
-luma check main.lm     # Check for errors without running
-luma run --time        # Show execution time
-luma run --debug all   # Debug output
+luma new myproject        # Create a new project
+luma new --file mymod     # Create a single .lm file with module declaration
+luma run                  # Run from luma.toml entry point
+luma run main.lm          # Run a specific file
+luma check main.lm        # Check for errors without running
+luma run --time           # Show execution time
+luma run --debug all      # Debug output
 ```
 
 ### Project Structure
@@ -138,8 +139,12 @@ void main() {
 
 ### Multi-file Projects
 
+Every importable file must declare its module name at the top:
+
 ```luma
 # source/greet.lm
+module greet;
+
 string greet(string name) {
     return "Hello, &{name}!";
 }
@@ -180,7 +185,7 @@ See [ROADMAP.md](ROADMAP.md) for what's done and what's coming.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) or visit [github.com/dylanisaiahp](https://github.com/dylanisaiahp).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

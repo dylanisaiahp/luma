@@ -25,15 +25,15 @@ void main() {
             print("verbose on");
         ("time", "t"):
             print("time on");
-        _:
+        else:
             print("unknown flag");
     }
 
-    list(string) no_flags = ();
+    list(string) no_flags = ("other", "test");
     match no_flags {
         ("verbose", "v"):
             print("verbose on");
-        _:
-            print("nothing passed");
+        else:
+            print("nothing matched");
     }
 }

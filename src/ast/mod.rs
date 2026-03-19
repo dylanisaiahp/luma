@@ -75,7 +75,6 @@ pub struct MatchArm {
 pub enum MatchPattern {
     Integer(i64),
     Range(i64, i64),
-    Wildcard,
     String(String),
     Set(Vec<MatchPattern>),
 }

@@ -1,5 +1,5 @@
 list(int) double_all(list(int) nums) {
-    list(int) result = ();
+    list(int) result = empty;
     for n in nums {
         result = result.add(n * 2);
     }
@@ -7,7 +7,7 @@ list(int) double_all(list(int) nums) {
 }
 
 list(string) names_from_scores(list(int) scores) {
-    list(string) result = ();
+    list(string) result = empty;
     if scores.contains(95) {
         result = result.add("Alice");
     }

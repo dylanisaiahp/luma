@@ -131,9 +131,7 @@ impl Parser {
             }
             last_position = self.position;
 
-            // Check for maybe(type) function_name() pattern
-            // Tokens: maybe ( type ) identifier (
-            //           +0   +1  +2  +3    +4    +5
+            // maybe(type) function_name() — tokens: maybe ( type ) ident (
             let is_maybe_function = if token.kind == TokenKind::Maybe {
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
@@ -143,6 +141,7 @@ impl Parser {
                 false
             };
 
+            // worry(type) function_name()
             let is_worry_function = if token.kind == TokenKind::Worry {
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
@@ -152,9 +151,7 @@ impl Parser {
                 false
             };
 
-            // Check for list(type) function_name() pattern
-            // Tokens: list ( type ) identifier (
-            //          +0   +1  +2  +3    +4    +5
+            // list(type) function_name()
             let is_list_function = if token.kind == TokenKind::List {
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
@@ -164,9 +161,7 @@ impl Parser {
                 false
             };
 
-            // Check for table(key, val) function_name() pattern
-            // Tokens: table ( key , val ) identifier (
-            //           +0   +1  +2  +3  +4  +5   +6    +7
+            // table(key, val) function_name() — tokens: table ( key , val ) ident (
             let is_table_function = if token.kind == TokenKind::Table {
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::Comma)
@@ -179,7 +174,7 @@ impl Parser {
 
             match token.kind {
                 TokenKind::Void if self.is_typed_function() => {
-                    self.advance(); // consume 'void'
+                    self.advance();
                     if let Some(func) = self.parse_function("void".to_string()) {
                         statements.push(func);
                     }
@@ -199,8 +194,13 @@ impl Parser {
                         statements.push(func);
                     }
                 }
+                TokenKind::Char if self.is_typed_function() => {
+                    self.advance();
+                    if let Some(func) = self.parse_function("char".to_string()) {
+                        statements.push(func);
+                    }
+                }
                 TokenKind::Maybe if is_maybe_function => {
-                    // maybe(int) function_name() { ... }
                     self.advance(); // consume 'maybe'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
@@ -211,6 +211,7 @@ impl Parser {
                         Some(TokenKind::Float) => "float".to_string(),
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
+                        Some(TokenKind::Char) => "char".to_string(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -222,7 +223,7 @@ impl Parser {
                             continue;
                         }
                     };
-                    self.advance(); // consume inner type
+                    self.advance();
                     if let Err(e) = self.expect_token(TokenKind::RParen) {
                         self.errors.push(e);
                         continue;
@@ -233,7 +234,6 @@ impl Parser {
                     }
                 }
                 TokenKind::Worry if is_worry_function => {
-                    // worry(int) function_name() { ... }
                     self.advance(); // consume 'worry'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
@@ -244,6 +244,7 @@ impl Parser {
                         Some(TokenKind::Float) => "float".to_string(),
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
+                        Some(TokenKind::Char) => "char".to_string(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -255,7 +256,7 @@ impl Parser {
                             continue;
                         }
                     };
-                    self.advance(); // consume inner type
+                    self.advance();
                     if let Err(e) = self.expect_token(TokenKind::RParen) {
                         self.errors.push(e);
                         continue;
@@ -266,7 +267,6 @@ impl Parser {
                     }
                 }
                 TokenKind::List if is_list_function => {
-                    // list(int) function_name() { ... }
                     self.advance(); // consume 'list'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
@@ -278,7 +278,6 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
-                        Some(TokenKind::Word) => "word".to_string(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -290,7 +289,7 @@ impl Parser {
                             continue;
                         }
                     };
-                    self.advance(); // consume inner type
+                    self.advance();
                     if let Err(e) = self.expect_token(TokenKind::RParen) {
                         self.errors.push(e);
                         continue;
@@ -301,7 +300,6 @@ impl Parser {
                     }
                 }
                 TokenKind::Table if is_table_function => {
-                    // table(string, int) function_name() { ... }
                     self.advance(); // consume 'table'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
@@ -313,7 +311,6 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
-                        Some(TokenKind::Word) => "word".to_string(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -325,7 +322,7 @@ impl Parser {
                             continue;
                         }
                     };
-                    self.advance(); // consume key type
+                    self.advance();
                     if let Err(e) = self.expect_token(TokenKind::Comma) {
                         self.errors.push(e);
                         continue;
@@ -336,7 +333,6 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
-                        Some(TokenKind::Word) => "word".to_string(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -348,7 +344,7 @@ impl Parser {
                             continue;
                         }
                     };
-                    self.advance(); // consume val type
+                    self.advance();
                     if let Err(e) = self.expect_token(TokenKind::RParen) {
                         self.errors.push(e);
                         continue;
@@ -382,14 +378,11 @@ impl Parser {
                             continue;
                         }
                     };
-                    // Check for selective import:
-                    //   use http.client;           — single item, no parens
-                    //   use http.(client, request); — multiple items
                     let items = if let Some(TokenKind::Dot) = self.current_token().map(|t| &t.kind)
                     {
                         self.advance(); // consume '.'
                         if let Some(TokenKind::LParen) = self.current_token().map(|t| &t.kind) {
-                            // Multiple: use http.(client, request);
+                            // Multiple: use http.(client, request)
                             self.advance(); // consume '('
                             let mut selected = Vec::new();
                             while let Some(t) = self.current_token() {
@@ -414,7 +407,7 @@ impl Parser {
                         } else if let Some(TokenKind::Identifier(name)) =
                             self.current_token().map(|t| &t.kind)
                         {
-                            // Single: use http.client;
+                            // Single: use http.client
                             let name = name.clone();
                             self.advance();
                             Some(vec![name])
@@ -431,7 +424,6 @@ impl Parser {
                     } else {
                         None
                     };
-                    // consume optional semicolon
                     if let Some(TokenKind::Semicolon) = self.current_token().map(|t| &t.kind) {
                         self.advance();
                     }

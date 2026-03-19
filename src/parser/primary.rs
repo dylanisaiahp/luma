@@ -53,6 +53,9 @@ impl Parser {
                     TokenKind::LParen => {
                         self.advance(); // consume '('
 
+                        // Empty parens () — only valid as a list literal in explicit list context.
+                        // For list/table variable declarations, `empty` must be used instead.
+                        // () is still valid as an empty list expression in other contexts (e.g. function args).
                         if let Some(t) = self.current_token()
                             && t.kind == TokenKind::RParen
                         {
@@ -96,8 +99,7 @@ impl Parser {
                     TokenKind::StringLiteral(_) | TokenKind::Interpolation(_) => {
                         self.parse_string_sequence()
                     }
-                    // Single-quoted char/word literal — defer type to declaration context,
-                    // parser just produces a CharLiteral expr; interpreter assigns to Char or Word.
+                    // Single-quoted literal — always a char (word type removed)
                     TokenKind::CharLiteral(s) => {
                         self.advance();
                         Ok(Expr {
@@ -150,15 +152,13 @@ impl Parser {
                     | TokenKind::Int
                     | TokenKind::Float
                     | TokenKind::String
-                    | TokenKind::Char
-                    | TokenKind::Word => {
+                    | TokenKind::Char => {
                         let name = match token.kind {
                             TokenKind::Read => "read".to_string(),
                             TokenKind::Int => "int".to_string(),
                             TokenKind::Float => "float".to_string(),
                             TokenKind::String => "string".to_string(),
                             TokenKind::Char => "char".to_string(),
-                            TokenKind::Word => "word".to_string(),
                             _ => unreachable!(),
                         };
                         self.advance();
@@ -267,8 +267,6 @@ impl Parser {
             }
         }
 
-        // Empty string "" — parts contains one ExprKind::String("") which is correct
-        // But if parts is somehow empty (shouldn't happen), return empty string
         if parts.is_empty() {
             return Ok(Expr {
                 kind: ExprKind::String(String::new()),

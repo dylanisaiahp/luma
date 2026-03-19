@@ -37,7 +37,6 @@ pub enum TokenKind {
     List,
     Table,
     Char,
-    Word,
     Struct,
     Module,
     Identifier(String),
@@ -106,7 +105,6 @@ impl fmt::Display for TokenKind {
             TokenKind::List => write!(f, "list"),
             TokenKind::Table => write!(f, "table"),
             TokenKind::Char => write!(f, "char"),
-            TokenKind::Word => write!(f, "word"),
             TokenKind::Struct => write!(f, "struct"),
             TokenKind::Module => write!(f, "module"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
@@ -177,7 +175,6 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::List => TokenKind::List,
             crate::syntax::Keyword::Table => TokenKind::Table,
             crate::syntax::Keyword::Char => TokenKind::Char,
-            crate::syntax::Keyword::Word => TokenKind::Word,
             crate::syntax::Keyword::Struct => TokenKind::Struct,
             crate::syntax::Keyword::Module => TokenKind::Module,
         }

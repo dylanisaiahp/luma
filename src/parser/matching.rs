@@ -68,30 +68,6 @@ impl Parser {
                     }
                     else_arm = Some(body);
                 }
-                TokenKind::Identifier(ref s) if s == "_" => {
-                    self.advance();
-                    if let Err(e) = self.expect_token(TokenKind::Colon) {
-                        self.errors.push(e);
-                        return None;
-                    }
-                    let mut body = Vec::new();
-                    while let Some(t) = self.current_token().cloned() {
-                        if matches!(t.kind, TokenKind::RBrace | TokenKind::Else)
-                            || self.is_start_of_match_pattern()
-                        {
-                            break;
-                        }
-                        if let Some(stmt) = self.parse_statement() {
-                            body.push(stmt);
-                        } else {
-                            self.advance();
-                        }
-                    }
-                    arms.push(MatchArm {
-                        pattern: MatchPattern::Wildcard,
-                        body,
-                    });
-                }
                 // Set pattern: ("hello", "hi", 1):
                 TokenKind::LParen => {
                     self.advance(); // consume '('
@@ -197,8 +173,9 @@ impl Parser {
                         }
                         _ => {
                             self.errors.push(ParseError::UnexpectedToken {
-                                expected: "valid match pattern (integer, string, range(), or set)"
-                                    .to_string(),
+                                expected:
+                                    "valid match pattern (integer, string, range(), set, or else)"
+                                        .to_string(),
                                 got: token.kind,
                                 line_num: token.line,
                                 col_num: token.column,
@@ -237,7 +214,7 @@ impl Parser {
             Some(TokenKind::Number(_)) => true,
             Some(TokenKind::StringLiteral(_)) => true,
             Some(TokenKind::LParen) => true,
-            Some(TokenKind::Identifier(name)) if name == "range" || name == "_" => true,
+            Some(TokenKind::Identifier(name)) if name == "range" => true,
             _ => false,
         }
     }

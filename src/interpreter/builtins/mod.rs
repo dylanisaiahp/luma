@@ -6,13 +6,12 @@ mod io;
 mod numeric;
 mod text;
 
-// Re-export all top-level builtins so call sites stay identical
 pub use collections::{list_method, table_method};
 pub use convert::{eval_float, eval_int, eval_random, eval_string};
 pub use handles::{fetch_method, file_method, input_method};
 pub use io::{eval_fetch, eval_file, eval_input, eval_read, eval_run, eval_write};
 pub use numeric::{float_method, int_method};
-pub use text::{char_method, string_method, word_method};
+pub use text::{char_method, string_method};
 
 use crate::interpreter::value::{RuntimeError, Value};
 
@@ -42,7 +41,6 @@ pub fn eval_method(
         },
         Value::String(s) => string_method(s, method, args, line, column),
         Value::Char(c) => char_method(c, method, args, line, column),
-        Value::Word(w) => word_method(w, method, args, line, column),
         Value::Boolean(b) => match method {
             "to_string" => Ok(Value::String(b.to_string())),
             "exists" => Ok(Value::Boolean(*b)),

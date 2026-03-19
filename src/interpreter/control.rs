@@ -191,8 +191,6 @@ impl Interpreter {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
-        // Save and restore return_slot so nested calls don't clobber each other.
-        // e.g. fib(n-1) + fib(n-2): the second call must not wipe the first call's slot.
         let saved_return_slot = self.return_slot.take();
 
         self.push_scope();
@@ -224,7 +222,6 @@ impl Interpreter {
 
         self.pop_scope();
 
-        // Restore the caller's return_slot now that this call is done
         if self.return_slot.is_none() {
             self.return_slot = saved_return_slot;
         }
@@ -355,7 +352,6 @@ impl Interpreter {
         let match_val = self.evaluate_expression(value)?;
 
         // List match — iterate each element, fire every arm that matches.
-        // Wildcard fires once only if nothing matched at all.
         if let Value::List(items) = &match_val {
             let items = items.clone();
             let mut any_matched = false;
@@ -364,9 +360,6 @@ impl Interpreter {
             for item in &items {
                 let mut item_matched = false;
                 for arm in arms {
-                    if matches!(arm.pattern, MatchPattern::Wildcard) {
-                        continue; // skip wildcard on per-item pass
-                    }
                     if self.pattern_matches(&arm.pattern, item) {
                         self.push_scope();
                         for stmt in &arm.body {
@@ -382,30 +375,15 @@ impl Interpreter {
                 }
             }
 
-            // Wildcard / else — fires once if nothing matched at all
-            if !any_matched {
-                if let Some(else_body) = else_arm {
-                    self.push_scope();
-                    for stmt in else_body {
-                        self.execute_statement(stmt)?;
-                    }
-                    self.pop_scope();
-                } else {
-                    // Check for explicit wildcard arm
-                    for arm in arms {
-                        if matches!(arm.pattern, MatchPattern::Wildcard) {
-                            self.push_scope();
-                            for stmt in &arm.body {
-                                self.execute_statement(stmt)?;
-                            }
-                            self.pop_scope();
-                            break;
-                        }
-                    }
+            // else arm fires once if nothing matched at all
+            if !any_matched && let Some(else_body) = else_arm {
+                self.push_scope();
+                for stmt in else_body {
+                    self.execute_statement(stmt)?;
                 }
+                self.pop_scope();
             }
 
-            // Always hint about unmatched items regardless of whether something else matched
             if !unmatched.is_empty() {
                 eprintln!(
                     "[?] {} item(s) did not match any pattern: {}",
@@ -421,11 +399,10 @@ impl Interpreter {
             return Ok(Value::Void);
         }
 
-        // Scalar match — original behaviour, first match wins
+        // Scalar match — first match wins
         let mut matched = false;
         for arm in arms {
-            let is_match = self.pattern_matches(&arm.pattern, &match_val);
-            if is_match {
+            if self.pattern_matches(&arm.pattern, &match_val) {
                 self.push_scope();
                 for stmt in &arm.body {
                     self.execute_statement(stmt)?;
@@ -453,7 +430,6 @@ impl Interpreter {
             MatchPattern::Range(start, end) => {
                 matches!(value, Value::Integer(m) if m >= start && m <= end)
             }
-            MatchPattern::Wildcard => true,
             MatchPattern::String(s) => matches!(value, Value::String(m) if m == s),
             MatchPattern::Set(patterns) => patterns.iter().any(|p| self.pattern_matches(p, value)),
         }

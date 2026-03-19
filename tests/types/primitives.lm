@@ -48,8 +48,4 @@ void main() {
     # char
     char ch = 'a';
     print(ch);
-
-    # word
-    word tag = 'hello';
-    print(tag);
 }

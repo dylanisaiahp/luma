@@ -17,8 +17,12 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Create a new Luma project
-    New { name: String },
+    /// Create a new Luma project or file
+    New {
+        name: String,
+        #[arg(long, help = "Create a single .lm file instead of a project")]
+        file: bool,
+    },
 
     /// Run a Luma file or project
     #[command(trailing_var_arg = true)]
@@ -64,7 +68,7 @@ impl LumaToml {
         for line in content.lines() {
             let line = line.trim();
             if line.starts_with('[') {
-                continue; // skip section headers like [project]
+                continue;
             }
             if let Some(val) = parse_toml_string(line, "name") {
                 name = val;
@@ -98,7 +102,13 @@ fn parse_toml_string(line: &str, key: &str) -> Option<String> {
 
 pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
-        Commands::New { name } => create_project(&name),
+        Commands::New { name, file } => {
+            if file {
+                create_file_lm(&name)
+            } else {
+                create_project(&name)
+            }
+        }
         Commands::Run {
             file,
             time,
@@ -134,11 +144,9 @@ fn resolve_entry_from_toml() -> anyhow::Result<String> {
 
     match config.entry {
         Some(entry) => {
-            // Try the path directly first
             if Path::new(&entry).exists() {
                 return Ok(entry);
             }
-            // Try to find it by filename under source/
             let filename = Path::new(&entry)
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -160,7 +168,6 @@ fn resolve_entry_from_toml() -> anyhow::Result<String> {
     }
 }
 
-/// Recursively search source/ for a file with the given name.
 fn find_in_source(filename: &str) -> Option<PathBuf> {
     search_dir(Path::new("source"), filename)
 }
@@ -181,44 +188,29 @@ fn search_dir(dir: &Path, filename: &str) -> Option<PathBuf> {
 }
 
 /// Resolve a `use` module name to a file path.
-/// Resolution order:
-///   1. Scan source/ recursively for a file containing `module <name>;`
-///   2. Check source/<name>.lm directly
-///   3. Check same directory as the importing file
+///
+/// Rules (new system):
+///   - Scan source/ recursively for a file containing `module <name>;`
+///   - The module declaration file CAN have the same name as the module (e.g. parser.lm with module parser;)
+///   - No filename fallback — every importable file must declare its module name
+///   - Check same directory as the importing file as a final fallback
 fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
-    let direct = PathBuf::from(format!("source/{}.lm", module_name));
-    let declared = find_module_declaration(Path::new("source"), module_name);
-
-    // Conflict: both source/<n>.lm and a module declaration exist
-    if direct.exists() && declared.is_some() {
-        eprintln!(
-            "[!] Module conflict: '{}' matches both 'source/{}.lm' and a 'module {};' declaration.\n    Remove one to resolve the conflict.",
-            module_name, module_name, module_name
-        );
-        std::process::exit(1);
-    }
-
-    // 1. Scan source/ for a file declaring `module <n>;`
-    if let Some(path) = declared {
+    // 1. Scan source/ for a file declaring `module <name>;`
+    if let Some(path) = find_module_declaration(Path::new("source"), module_name) {
         return Some(path);
     }
 
-    // 2. source/<n>.lm
-    if direct.exists() {
-        return Some(direct);
-    }
-
-    // 3. Same directory as importing file
-    if let Some(parent) = Path::new(importing_file).parent() {
-        let sibling = parent.join(format!("{}.lm", module_name));
-        if sibling.exists() {
-            return Some(sibling);
-        }
+    // 2. Same directory as importing file
+    if let Some(parent) = Path::new(importing_file).parent()
+        && let Some(path) = find_module_declaration(parent, module_name)
+    {
+        return Some(path);
     }
 
     None
 }
 
+/// Recursively search dir for a .lm file that contains `module <name>;`
 fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
     let entries = fs::read_dir(dir).ok()?;
     for entry in entries.flatten() {
@@ -287,7 +279,7 @@ fn load_with_uses(
         collector.add_parse_error(error);
     }
 
-    // Expand use statements first
+    // Expand use statements
     let mut expanded: Vec<Stmt> = Vec::new();
     for stmt in statements {
         match &stmt {
@@ -298,8 +290,7 @@ fn load_with_uses(
                         let mut mod_stmts =
                             load_with_uses(&mod_path_str, visited, collector, debug);
 
-                        // If selective import: use parser.(core, error)
-                        // Filter to only the named items (functions/structs matching those names)
+                        // Selective import: use http.(client, request)
                         if let Some(selected) = items {
                             mod_stmts.retain(|s| match s {
                                 Stmt::Function { name, .. } => selected.contains(name),
@@ -308,7 +299,7 @@ fn load_with_uses(
                             });
                         }
 
-                        // Skip ModuleDeclaration stmts — they're metadata, not executable
+                        // Skip ModuleDeclaration stmts — metadata only
                         for s in mod_stmts {
                             if !matches!(s, Stmt::ModuleDeclaration { .. }) {
                                 expanded.push(s);
@@ -317,13 +308,13 @@ fn load_with_uses(
                     }
                     None => {
                         eprintln!(
-                            "[!] Could not resolve module '{}' (imported in '{}')",
-                            module, file_path
+                            "[!] Could not resolve module '{}' (imported in '{}')\n    \
+                             Make sure the file contains: module {};",
+                            module, file_path, module
                         );
                     }
                 }
             }
-            // ModuleDeclaration is metadata — keep it so callers can detect it
             _ => expanded.push(stmt),
         }
     }
@@ -356,7 +347,6 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     let gitignore = "# Luma build output\n.luma/\n\n# OS\n.DS_Store\nThumbs.db\n";
     fs::write(path.join(".gitignore"), gitignore)?;
 
-    // Initialize git repository
     let git_result = std::process::Command::new("git")
         .arg("init")
         .current_dir(path)
@@ -380,13 +370,30 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Create a single .lm file with a module declaration at the top.
+fn create_file_lm(name: &str) -> anyhow::Result<()> {
+    // Strip .lm extension if provided, derive module name from filename stem
+    let stem = name.trim_end_matches(".lm");
+    let filename = format!("{}.lm", stem);
+    let path = Path::new(&filename);
+
+    if path.exists() {
+        anyhow::bail!("File '{}' already exists", filename);
+    }
+
+    let content = format!("module {};\n", stem);
+    fs::write(path, &content)?;
+
+    println!("[✓] Created {}", filename);
+    Ok(())
+}
+
 fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
     let start = Instant::now();
 
     let source = fs::read_to_string(file)?;
     let mut collector = ErrorCollector::new(&source, file);
 
-    // Load the entry file, recursively resolving use statements
     let mut visited = std::collections::HashSet::new();
     let statements = load_with_uses(file, &mut visited, &mut collector, &debug);
 

@@ -129,7 +129,6 @@ pub fn list_method(
                 .map(|v| match v {
                     Value::String(s) => s.clone(),
                     Value::Char(c) => c.to_string(),
-                    Value::Word(w) => w.clone(),
                     Value::Integer(n) => n.to_string(),
                     Value::Float(f) => f.to_string(),
                     Value::Boolean(b) => b.to_string(),

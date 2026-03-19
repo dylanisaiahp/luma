@@ -14,7 +14,6 @@ impl Parser {
                     let token = self.current_token().cloned().unwrap();
 
                     // Detect struct instantiation: Identifier(fieldName: value, ...)
-                    // Lookahead: current=LParen, next=Identifier, after=Colon
                     let is_struct_instantiate = matches!(&expr.kind, ExprKind::Identifier(_))
                         && matches!(self.tokens.get(self.position + 1), Some(t) if matches!(&t.kind, TokenKind::Identifier(_)))
                         && matches!(self.tokens.get(self.position + 2), Some(t) if t.kind == TokenKind::Colon);
@@ -31,7 +30,6 @@ impl Parser {
                             if t.kind == TokenKind::RParen {
                                 break;
                             }
-                            // field_name: value
                             let field_name = match self.current_token().cloned() {
                                 Some(t) => match t.kind {
                                     TokenKind::Identifier(n) => {
@@ -110,7 +108,6 @@ impl Parser {
                     let dot_token = self.current_token().cloned().unwrap();
                     self.advance(); // consume '.'
 
-                    // Expect method/field name — keywords are valid
                     let member = match self.current_token().cloned() {
                         Some(t) => {
                             let name = keyword_as_method_name(&t.kind);
@@ -132,7 +129,6 @@ impl Parser {
                         None => return Err(ParseError::UnexpectedEOF),
                     };
 
-                    // If next token is '(' it's a method call, otherwise it's a field access
                     if let Some(t) = self.current_token()
                         && t.kind == TokenKind::LParen
                     {
@@ -184,7 +180,6 @@ impl Parser {
                             column: dot_token.column,
                         };
                     } else {
-                        // No '(' — field access
                         expr = Expr {
                             kind: ExprKind::FieldAccess {
                                 object: Box::new(expr),
@@ -212,7 +207,6 @@ fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
         TokenKind::Float => Some("float".to_string()),
         TokenKind::Bool => Some("bool".to_string()),
         TokenKind::Char => Some("char".to_string()),
-        TokenKind::Word => Some("word".to_string()),
         TokenKind::In => Some("in".to_string()),
         TokenKind::Not => Some("not".to_string()),
         TokenKind::List => Some("list".to_string()),
@@ -221,7 +215,7 @@ fn keyword_as_method_name(kind: &TokenKind) -> Option<String> {
     }
 }
 
-// For .as(int), .first(char), .last(word) — type keywords as string arguments
+// For .as(int), .first(char) — type keywords as string arguments
 fn type_keyword_as_string(kind: &TokenKind) -> Option<String> {
     match kind {
         TokenKind::Int => Some("int".to_string()),
@@ -229,7 +223,6 @@ fn type_keyword_as_string(kind: &TokenKind) -> Option<String> {
         TokenKind::Bool => Some("bool".to_string()),
         TokenKind::String => Some("string".to_string()),
         TokenKind::Char => Some("char".to_string()),
-        TokenKind::Word => Some("word".to_string()),
         _ => None,
     }
 }

@@ -11,7 +11,7 @@ fn suggest_from_token(token: &TokenKind) -> Option<String> {
             "fn" | "def" | "func" | "function" | "fun" =>
                 Some("Luma defines functions with the return type first:\n           int add(int x, int y) { return x + y; }\n           void greet(string name) { print(name); }".to_string()),
             "null" | "nil" | "undefined" | "none" | "None" | "NULL" =>
-                Some("Luma uses 'maybe()' for optional values. This is coming soon!".to_string()),
+                Some("Luma uses 'empty' for absent values and 'maybe(T)' for optional types.".to_string()),
             "elif" =>
                 Some("Luma uses 'else if' instead of 'elif'.".to_string()),
             "import" | "include" | "require" =>
@@ -44,7 +44,6 @@ impl ErrorCollector {
                     .unwrap_or("")
                     .to_string();
 
-                // Check if the token that was found is a known mistake
                 if let Some(suggestion) = suggest_from_token(&got) {
                     let span = Span {
                         filename: self.filename.clone(),
@@ -74,21 +73,28 @@ impl ErrorCollector {
                         length: 1,
                     };
 
-                    // "statement" is an internal parser term — never show it to users
                     if expected == "statement" {
                         self.has_errors = true;
                         return;
                     }
+
+                    // Special hint for () used instead of empty
+                    let hint = if expected == "empty" {
+                        "Use 'empty' to initialize an empty list or table: 'list(int) x = empty;'"
+                            .to_string()
+                    } else {
+                        format!(
+                            "Suggestion: Add a {} at the end of this statement.",
+                            expected
+                        )
+                    };
 
                     self.errors.push(Diagnostic::new_error(
                         "E001",
                         &format!("Missing {}", expected),
                         span,
                         source_line,
-                        &format!(
-                            "Suggestion: Add a {} at the end of this statement.",
-                            expected
-                        ),
+                        &hint,
                     ));
                 }
             }

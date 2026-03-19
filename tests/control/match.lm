@@ -14,7 +14,7 @@ void main() {
             print("one");
         range(2, 5):
             print("Good Try!");
-        _:
+        else:
             print("other");
     }
 
@@ -46,7 +46,7 @@ void main() {
             print("verbose on");
         ("time", "t"):
             print("time on");
-        _:
+        else:
             print("unknown flag");
     }
 

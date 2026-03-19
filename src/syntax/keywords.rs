@@ -29,7 +29,6 @@ pub enum Keyword {
     List,
     Table,
     Char,
-    Word,
     Struct,
     Module,
 }
@@ -64,7 +63,6 @@ impl FromStr for Keyword {
             "list" => Ok(Keyword::List),
             "table" => Ok(Keyword::Table),
             "char" => Ok(Keyword::Char),
-            "word" => Ok(Keyword::Word),
             "struct" => Ok(Keyword::Struct),
             "module" => Ok(Keyword::Module),
             _ => Err(()),

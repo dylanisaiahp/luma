@@ -18,8 +18,6 @@ pub struct Interpreter {
     pub output_buffer: Vec<String>,
     pub debug_mode: bool,
     /// Holds a List or Table value being returned from a function.
-    /// The encode/decode string protocol can't round-trip complex values,
-    /// so we stash them here and use the sentinel "__return_slot__" instead.
     pub return_slot: Option<Value>,
 }
 
@@ -98,7 +96,10 @@ impl Interpreter {
                     &format!("Unused variable: '{}'", info.name),
                     span,
                     source_line,
-                    "If you meant to ignore it, prefix with underscore: _name",
+                    &format!(
+                        "If you meant to ignore it, prefix with underscore: _{}",
+                        info.name
+                    ),
                 );
                 self.warnings.push(warning);
             }
@@ -173,7 +174,6 @@ impl Interpreter {
                 }
                 Ok(Value::Void)
             }
-            // Struct declarations are registered during register_functions; nothing to execute
             Stmt::StructDeclaration { .. } => Ok(Value::Void),
             Stmt::Use { .. } => Ok(Value::Void),
             Stmt::ModuleDeclaration { .. } => Ok(Value::Void),
@@ -251,9 +251,6 @@ impl Interpreter {
         }
     }
 
-    /// Encode a return value as a string sentinel for the error-propagation
-    /// return mechanism. List and Table values cannot be serialized safely,
-    /// so they are stashed in `self.return_slot` and a sentinel is returned.
     pub fn encode_return_value(&mut self, val: &Value) -> String {
         match val {
             Value::Integer(n) => format!("int:{}", n),
@@ -261,15 +258,12 @@ impl Interpreter {
             Value::Boolean(b) => format!("bool:{}", b),
             Value::String(s) => format!("string:{}", s),
             Value::Char(c) => format!("char:{}", c),
-            Value::Word(w) => format!("word:{}", w),
             Value::Void => "void:".to_string(),
             Value::Maybe(Some(inner)) => {
                 let inner_encoded = self.encode_return_value(inner);
                 format!("maybe:{}", inner_encoded)
             }
             Value::Maybe(None) => "maybe:empty".to_string(),
-            // List and Table cannot be round-tripped through a string.
-            // Stash the value in the slot and use a sentinel instead.
             Value::List(_) | Value::Table(_) => {
                 self.return_slot = Some(val.clone());
                 "__return_slot__".to_string()
@@ -292,8 +286,6 @@ impl Interpreter {
             Value::String(rest.to_string())
         } else if let Some(rest) = encoded.strip_prefix("char:") {
             Value::Char(rest.chars().next().unwrap_or('\0'))
-        } else if let Some(rest) = encoded.strip_prefix("word:") {
-            Value::Word(rest.to_string())
         } else if encoded == "maybe:empty" {
             Value::Maybe(None)
         } else if let Some(rest) = encoded.strip_prefix("maybe:") {

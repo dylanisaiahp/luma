@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
 impl Parser {
-    // Helper: parse a simple inner type (int/float/bool/string/char/word)
+    // Helper: parse a simple inner type (int/float/bool/string/char)
     fn parse_inner_type(&mut self) -> Option<String> {
         match self.current_token().map(|t| t.kind.clone()) {
             Some(TokenKind::Int) => {
@@ -28,14 +28,10 @@ impl Parser {
                 self.advance();
                 Some("char".to_string())
             }
-            Some(TokenKind::Word) => {
-                self.advance();
-                Some("word".to_string())
-            }
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "inner type (int/float/bool/string/char/word)".to_string(),
+                    expected: "inner type (int/float/bool/string/char)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -67,10 +63,6 @@ impl Parser {
             Some(TokenKind::Char) => {
                 self.advance();
                 Some("char".to_string())
-            }
-            Some(TokenKind::Word) => {
-                self.advance();
-                Some("word".to_string())
             }
             Some(TokenKind::Maybe) => {
                 self.advance();
@@ -143,7 +135,7 @@ impl Parser {
                     let token = self.current_or_eof();
                     self.errors.push(ParseError::UnexpectedToken {
                         expected:
-                            "type (int/float/bool/string/char/word/maybe/list/table or struct name)"
+                            "type (int/float/bool/string/char/maybe/list/table or struct name)"
                                 .to_string(),
                         got: token.kind,
                         line_num: token.line,
@@ -155,7 +147,7 @@ impl Parser {
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "type (int/float/bool/string/char/word/maybe/list/table)".to_string(),
+                    expected: "type (int/float/bool/string/char/maybe/list/table)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -165,19 +157,9 @@ impl Parser {
         }
     }
 
-    /// Peek ahead from the current position to decide if this looks like a
-    /// table literal `("key": value, ...)` vs a function call `foo()` or
-    /// a list literal `(1, 2, 3)`.
-    ///
-    /// Rules:
-    /// - If current token is NOT `(`, it's not a table literal.
-    /// - If current token is `(` followed immediately by `)`, it's an empty
-    ///   literal — treat as table literal only if the declaration type is table.
-    /// - If current token is `(` and we find a `:` before the matching `)`,
-    ///   it's a table literal.
-    /// - Otherwise (no `:` found), it's a list literal or function call.
+    /// Peek ahead to decide if the RHS is a table literal `("key": value, ...)`.
+    /// A table literal must have a `:` at depth 1 inside the parens.
     pub fn looks_like_table_literal(&self) -> bool {
-        // Must start with `(`
         if !matches!(
             self.tokens.get(self.position).map(|t| &t.kind),
             Some(TokenKind::LParen)
@@ -185,8 +167,6 @@ impl Parser {
             return false;
         }
 
-        // Scan ahead counting paren depth until we find a `:` or close the
-        // outer `(`. We don't want to cross into nested function calls.
         let mut depth = 0;
         let mut i = self.position;
         while i < self.tokens.len() {
@@ -195,12 +175,10 @@ impl Parser {
                 TokenKind::RParen => {
                     depth -= 1;
                     if depth == 0 {
-                        // Closed without finding `:` at depth 1 — not a table literal.
                         return false;
                     }
                 }
                 TokenKind::Colon if depth == 1 => {
-                    // Found a `:` at the top level of the parens — table literal.
                     return true;
                 }
                 TokenKind::Eof | TokenKind::Semicolon => break,
@@ -318,12 +296,9 @@ impl Parser {
             return None;
         }
 
-        // For table-typed variables, we need to decide whether the RHS is:
-        //   a) a table literal: ("key": val, ...)  → use parse_table_literal
-        //   b) a function call or expression: foo() → use parse_expression
-        //
-        // We use looks_like_table_literal() to distinguish. For non-table
-        // types (list, etc.) we always use parse_expression.
+        // For table-typed variables, decide if RHS is a table literal or expression.
+        // `empty` is handled by parse_expression which returns ExprKind::Empty.
+        // `()` is no longer valid for empty list/table — use `empty`.
         let value = if type_name.starts_with("table") && self.looks_like_table_literal() {
             match self.parse_table_literal() {
                 Ok(expr) => expr,
@@ -335,7 +310,22 @@ impl Parser {
             }
         } else {
             match self.parse_expression() {
-                Ok(expr) => expr,
+                Ok(expr) => {
+                    // Guard: `()` is not valid for list/table initialization — use `empty`
+                    if (type_name.starts_with("list") || type_name.starts_with("table"))
+                        && matches!(expr.kind, ExprKind::List(ref items) if items.is_empty())
+                    {
+                        self.errors.push(ParseError::UnexpectedToken {
+                            expected: "empty".to_string(),
+                            got: TokenKind::LParen,
+                            line_num: expr.line,
+                            col_num: expr.column,
+                        });
+                        self.position = start_pos;
+                        return None;
+                    }
+                    expr
+                }
                 Err(e) => {
                     self.errors.push(e);
                     self.position = start_pos;
@@ -395,12 +385,13 @@ impl Parser {
         })
     }
 
-    // Parse table literal: ("key": value, "key2": value2) or empty
+    // Parse table literal: ("key": value, "key2": value2)
+    // Note: `empty` is handled separately via parse_expression → ExprKind::Empty
     pub fn parse_table_literal(&mut self) -> Result<Expr, ParseError> {
         let line = self.current_or_eof().line;
         let col = self.current_or_eof().column;
 
-        // Handle `empty`
+        // Handle `empty` keyword
         if let Some(TokenKind::Empty) = self.current_token().map(|t| &t.kind) {
             self.advance();
             return Ok(Expr {
@@ -413,18 +404,6 @@ impl Parser {
         self.expect_token(TokenKind::LParen)?;
 
         let mut pairs = Vec::new();
-
-        // Empty table literal ()
-        if let Some(t) = self.current_token()
-            && t.kind == TokenKind::RParen
-        {
-            self.advance();
-            return Ok(Expr {
-                kind: ExprKind::Table(pairs),
-                line,
-                column: col,
-            });
-        }
 
         loop {
             let key = self.parse_expression()?;

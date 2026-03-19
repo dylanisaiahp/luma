@@ -15,7 +15,7 @@ void announce(string msg) {
 }
 
 list(int) range_list(int n) {
-    list(int) result = ();
+    list(int) result = empty;
     for i in range(0, n) {
         result = result.add(i);
     }

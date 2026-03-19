@@ -20,7 +20,6 @@ impl Interpreter {
         match val {
             Value::String(s) => s.clone(),
             Value::Char(c) => c.to_string(),
-            Value::Word(w) => w.clone(),
             Value::Integer(n) => n.to_string(),
             Value::Float(f) => {
                 if f.abs() > 1_000_000_000_000.0 || (f.abs() < 0.0001 && *f != 0.0) {
@@ -128,31 +127,17 @@ impl Interpreter {
                 });
             }
 
-            // word — from CharLiteral (Char variant used for word too) or string with no spaces
-            ("word", Value::Char(c)) => Value::Word(c.to_string()),
-            ("word", Value::Word(w)) => Value::Word(w),
-            ("word", Value::String(s)) => {
-                if s.contains(char::is_whitespace) {
-                    return Err(RuntimeError {
-                        message: format!(
-                            "Type mismatch: expected word (no whitespace), got \"{}\"",
-                            s
-                        ),
-                        line: value.line,
-                        column: value.column,
-                    });
-                }
-                Value::Word(s)
-            }
-
             // maybe — auto-wrap non-maybe values
             (t, Value::Maybe(inner)) if t.starts_with("maybe") => Value::Maybe(inner),
             (t, v) if t.starts_with("maybe") => Value::Maybe(Some(Box::new(v))),
+
             // worry — error case handled above via __raise__, success just passes value through
             (t, v) if t.starts_with("worry") => v,
+
             // list
             (t, Value::List(items)) if t.starts_with("list") => Value::List(items),
             (t, Value::Maybe(None)) if t.starts_with("list") => Value::List(Vec::new()),
+
             // table
             (t, Value::Table(pairs)) if t.starts_with("table") => Value::Table(pairs),
             (t, Value::Maybe(None)) if t.starts_with("table") => Value::Table(Vec::new()),

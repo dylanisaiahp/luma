@@ -24,7 +24,6 @@ impl Parser {
             | Some(TokenKind::Bool)
             | Some(TokenKind::String)
             | Some(TokenKind::Char)
-            | Some(TokenKind::Word)
             | Some(TokenKind::Maybe)
             | Some(TokenKind::Worry)
             | Some(TokenKind::List)
@@ -107,8 +106,6 @@ impl Parser {
             return Some(Stmt::Return(None));
         }
 
-        // If the return value looks like a table literal `("key": val, ...)`,
-        // use parse_table_literal so the colon tokens are handled correctly.
         let expr = if self.looks_like_table_literal() {
             match self.parse_table_literal() {
                 Ok(e) => e,

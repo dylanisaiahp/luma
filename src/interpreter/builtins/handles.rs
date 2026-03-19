@@ -9,7 +9,6 @@ pub fn fetch_method(
     column: usize,
 ) -> Result<Value, RuntimeError> {
     match method {
-        // TODO: switch to worry(string) once worry() is implemented
         "get" => match ureq::get(url).call() {
             Ok(mut response) => {
                 let body = response

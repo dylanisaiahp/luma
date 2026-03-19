@@ -1,7 +1,7 @@
 // src/interpreter/builtins/text.rs
 use crate::interpreter::value::{RuntimeError, Value};
 
-/// Shared methods across string, char, and word types.
+/// Shared methods across string and char types.
 pub fn text_methods(
     s: &str,
     method: &str,
@@ -20,9 +20,8 @@ pub fn text_methods(
         "contains" => Some(match args.first() {
             Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
             Some(Value::Char(c)) => Ok(Value::Boolean(s.contains(*c))),
-            Some(Value::Word(w)) => Ok(Value::Boolean(s.contains(w.as_str()))),
             _ => Err(RuntimeError {
-                message: "contains() takes one string/char/word argument".to_string(),
+                message: "contains() takes one string or char argument".to_string(),
                 line,
                 column,
             }),
@@ -30,9 +29,8 @@ pub fn text_methods(
         "starts_with" => Some(match args.first() {
             Some(Value::String(prefix)) => Ok(Value::Boolean(s.starts_with(prefix.as_str()))),
             Some(Value::Char(c)) => Ok(Value::Boolean(s.starts_with(*c))),
-            Some(Value::Word(w)) => Ok(Value::Boolean(s.starts_with(w.as_str()))),
             _ => Err(RuntimeError {
-                message: "starts_with() takes one string/char/word argument".to_string(),
+                message: "starts_with() takes one string or char argument".to_string(),
                 line,
                 column,
             }),
@@ -40,9 +38,8 @@ pub fn text_methods(
         "ends_with" => Some(match args.first() {
             Some(Value::String(suffix)) => Ok(Value::Boolean(s.ends_with(suffix.as_str()))),
             Some(Value::Char(c)) => Ok(Value::Boolean(s.ends_with(*c))),
-            Some(Value::Word(w)) => Ok(Value::Boolean(s.ends_with(w.as_str()))),
             _ => Err(RuntimeError {
-                message: "ends_with() takes one string/char/word argument".to_string(),
+                message: "ends_with() takes one string or char argument".to_string(),
                 line,
                 column,
             }),
@@ -95,16 +92,12 @@ pub fn text_methods(
                 Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
                 None => Ok(Value::Maybe(None)),
             },
-            Some(Value::String(kind)) if kind == "word" => match s.split_whitespace().next() {
-                Some(w) => Ok(Value::Maybe(Some(Box::new(Value::Word(w.to_string()))))),
-                None => Ok(Value::Maybe(None)),
-            },
             None => match s.chars().next() {
                 Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
                 None => Ok(Value::Maybe(None)),
             },
             _ => Err(RuntimeError {
-                message: "first() takes 'char' or 'word' as argument".to_string(),
+                message: "first() takes 'char' as argument, or no argument".to_string(),
                 line,
                 column,
             }),
@@ -114,16 +107,12 @@ pub fn text_methods(
                 Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
                 None => Ok(Value::Maybe(None)),
             },
-            Some(Value::String(kind)) if kind == "word" => match s.split_whitespace().next_back() {
-                Some(w) => Ok(Value::Maybe(Some(Box::new(Value::Word(w.to_string()))))),
-                None => Ok(Value::Maybe(None)),
-            },
             None => match s.chars().next_back() {
                 Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
                 None => Ok(Value::Maybe(None)),
             },
             _ => Err(RuntimeError {
-                message: "last() takes 'char' or 'word' as argument".to_string(),
+                message: "last() takes 'char' as argument, or no argument".to_string(),
                 line,
                 column,
             }),
@@ -152,13 +141,6 @@ pub fn text_methods(
                         Ok(Value::Maybe(None))
                     }
                 }
-                "word" => {
-                    if s.contains(char::is_whitespace) {
-                        Ok(Value::Maybe(None))
-                    } else {
-                        Ok(Value::Maybe(Some(Box::new(Value::Word(s.to_string())))))
-                    }
-                }
                 "string" => Ok(Value::Maybe(Some(Box::new(Value::String(s.to_string()))))),
                 _ => Err(RuntimeError {
                     message: format!("as() unknown target type '{}'", target),
@@ -168,7 +150,7 @@ pub fn text_methods(
             },
             _ => Err(RuntimeError {
                 message:
-                    "as() takes a type argument: as(int), as(float), as(bool), as(char), as(word)"
+                    "as() takes a type argument: as(int), as(float), as(bool), as(char), as(string)"
                         .to_string(),
                 line,
                 column,
@@ -214,30 +196,6 @@ pub fn char_method(
             } else {
                 Err(RuntimeError {
                     message: format!("char has no method '{}'", method),
-                    line,
-                    column,
-                })
-            }
-        }
-    }
-}
-
-pub fn word_method(
-    w: &str,
-    method: &str,
-    args: &[Value],
-    line: usize,
-    column: usize,
-) -> Result<Value, RuntimeError> {
-    match method {
-        "exists" => Ok(Value::Boolean(!w.is_empty())),
-        "to_string" => Ok(Value::String(w.to_string())),
-        _ => {
-            if let Some(result) = text_methods(w, method, args, line, column) {
-                result
-            } else {
-                Err(RuntimeError {
-                    message: format!("word has no method '{}'", method),
                     line,
                     column,
                 })

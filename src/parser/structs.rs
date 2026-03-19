@@ -8,13 +8,11 @@ impl Parser {
     pub fn parse_struct_declaration(&mut self) -> Option<Stmt> {
         let start_pos = self.position;
 
-        // consume 'struct'
         if let Err(e) = self.expect_token(TokenKind::Struct) {
             self.errors.push(e);
             return None;
         }
 
-        // struct name — must be an Identifier (PascalCase by convention)
         let name = match self.current_token().cloned() {
             Some(t) => match t.kind {
                 TokenKind::Identifier(n) => {
@@ -58,7 +56,6 @@ impl Parser {
                     return None;
                 }
                 _ => {
-                    // Try to parse a type — could be field or method
                     let type_name = match self.parse_type_string() {
                         Some(t) => t,
                         None => {
@@ -67,7 +64,6 @@ impl Parser {
                         }
                     };
 
-                    // Next must be an identifier (field name or method name)
                     let member_name = match self.current_token().cloned() {
                         Some(t) => match t.kind {
                             TokenKind::Identifier(n) => {
@@ -91,11 +87,10 @@ impl Parser {
                         }
                     };
 
-                    // If next is '(' it's a method, otherwise it's a field
                     if let Some(t) = self.current_token()
                         && t.kind == TokenKind::LParen
                     {
-                        // Method: parse params and body
+                        // Method
                         self.advance(); // consume '('
                         let mut params = Vec::new();
 
@@ -142,7 +137,7 @@ impl Parser {
                             body,
                         });
                     } else {
-                        // Field: expect semicolon
+                        // Field
                         if let Err(e) = self.expect_token(TokenKind::Semicolon) {
                             self.errors.push(e);
                             return None;

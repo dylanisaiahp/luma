@@ -100,7 +100,6 @@ fn format_value(val: &Value) -> String {
         Value::Float(f) => f.to_string(),
         Value::String(s) => format!("\"{}\"", s),
         Value::Char(c) => format!("'{}'", c),
-        Value::Word(w) => format!("'{}'", w),
         Value::Boolean(b) => b.to_string(),
         Value::Void => "void".to_string(),
         Value::Maybe(Some(inner)) => format!("Maybe({})", format_value(inner)),

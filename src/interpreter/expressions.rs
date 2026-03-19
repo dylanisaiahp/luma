@@ -12,6 +12,7 @@ impl Interpreter {
             ExprKind::Float(f) => Ok(Value::Float(*f)),
             ExprKind::String(s) => Ok(Value::String(s.clone())),
             ExprKind::Char(s) => {
+                // Single-quoted literals are always char
                 let mut chars = s.chars();
                 match (chars.next(), chars.next()) {
                     (Some(c), None) => Ok(Value::Char(c)),
@@ -160,7 +161,6 @@ impl Interpreter {
                 method,
                 args,
             } => {
-                // Check if the object resolves to a struct — if so, dispatch to struct method
                 let object_val = self.evaluate_expression(object)?;
                 if let Value::Struct { ref name, .. } = object_val {
                     let struct_name = name.clone();
@@ -181,7 +181,6 @@ impl Interpreter {
                         );
                     }
                 }
-                // Fall through to builtins
                 let mut arg_vals = Vec::new();
                 for arg in args {
                     arg_vals.push(self.evaluate_expression(arg)?);
