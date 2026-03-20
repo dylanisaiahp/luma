@@ -2,12 +2,13 @@
   "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
   "grammars": [
     {
-      "name": "lm",
+      "name": "luma",
       "camelcase": "Luma",
       "title": "Luma",
       "scope": "source.luma",
       "file-types": ["lm"],
       "injection-regex": "^luma$",
+      "highlights": "queries/highlights.scm",
       "class-name": "TreeSitterLuma"
     }
   ],
@@ -15,12 +16,7 @@
     "version": "0.1.0",
     "license": "MIT",
     "description": "Luma programming language",
-    "authors": [
-      {
-        "name": "dylanisaiahp",
-        "url": ""
-      }
-    ],
+    "authors": [{ "name": "dylanisaiahp", "url": "" }],
     "links": {
       "repository": "https://github.com/dylanisaiahp/luma",
       "funding": ""
