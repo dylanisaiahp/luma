@@ -3,7 +3,6 @@
   "if" "else" "while" "for" "in" "match"
   "return" "break" "raise" "not"
   "use" "module" "struct"
-  "empty"
 ] @keyword
 
 ; Types
@@ -19,7 +18,7 @@
 (char_literal) @string.special
 (empty) @constant.builtin
 
-; Strings — plain content and escape sequences
+; Strings
 (string_literal) @string
 (string_content) @string
 (escape_sequence) @string.escape
