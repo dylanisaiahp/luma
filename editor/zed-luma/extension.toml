@@ -7,6 +7,6 @@ authors = ["dylanisaiahp"]
 repository = "https://github.com/dylanisaiahp/luma"
 
 [grammars.luma]
-repository = "file:///mnt/Milo/Development/luma"
-rev = "e6889d358ad7323183f695f896e4e4b1f1eb9a4e"
+repository = "https://github.com/dylanisaiahp/luma"
+rev = "3a21cb1aed7d4c756ff85c28b9bc13905da6363c"
 path = "editor/tree-sitter-luma"
