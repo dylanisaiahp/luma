@@ -311,11 +311,8 @@
           }
         },
         {
-          "type": "IMMEDIATE_TOKEN",
-          "content": {
-            "type": "STRING",
-            "value": "}"
-          }
+          "type": "STRING",
+          "value": "}"
         }
       ]
     },
@@ -827,11 +824,8 @@
           ]
         },
         {
-          "type": "IMMEDIATE_TOKEN",
-          "content": {
-            "type": "STRING",
-            "value": "}"
-          }
+          "type": "STRING",
+          "value": "}"
         }
       ]
     },
@@ -1863,13 +1857,17 @@
           }
         },
         {
-          "type": "IMMEDIATE_TOKEN",
-          "content": {
-            "type": "STRING",
-            "value": "}"
-          }
+          "type": "SYMBOL",
+          "name": "interpolation_close"
         }
       ]
+    },
+    "interpolation_close": {
+      "type": "IMMEDIATE_TOKEN",
+      "content": {
+        "type": "STRING",
+        "value": "}"
+      }
     },
     "char_literal": {
       "type": "SEQ",
