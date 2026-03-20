@@ -6,3 +6,4 @@
 .DS_Store
 Thumbs.db
 editor/zed-luma/grammars/
+editor/tree-sitter-luma/node_modules/
