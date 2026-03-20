@@ -81,3 +81,5 @@
 ; Punctuation
 [ "(" ")" "{" "}" ] @punctuation.bracket
 [ ";" "," "." ":" ] @punctuation.delimiter
+
+(interpolation_close) @string
