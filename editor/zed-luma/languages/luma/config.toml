@@ -1,0 +1,8 @@
+name = "Luma"
+grammar = "luma"
+path_suffixes = ["lm"]
+line_comments = ["# "]
+block_comment = false
+indent_size = 4
+tab_size = 4
+hard_tabs = false

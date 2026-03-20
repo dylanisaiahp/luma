@@ -1,0 +1,12 @@
+id = "luma"
+name = "Luma"
+version = "0.1.0"
+schema_version = 1
+description = "Luma language support for Zed"
+authors = ["dylanisaiahp"]
+repository = "https://github.com/dylanisaiahp/luma"
+
+[grammars.luma]
+repository = "file:///mnt/Milo/Development/luma"
+rev = "e6889d358ad7323183f695f896e4e4b1f1eb9a4e"
+path = "editor/tree-sitter-luma"
