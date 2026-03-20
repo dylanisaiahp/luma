@@ -71,7 +71,7 @@ module.exports = grammar({
         field("name", $.identifier),
         "{",
         repeat(choice($.struct_field, $.struct_method)),
-        "}"
+        token.immediate("}")
       ),
 
     struct_field: ($) =>
@@ -175,7 +175,7 @@ module.exports = grammar({
         "{",
         repeat($.match_arm),
         optional($.match_else),
-        "}"
+        token.immediate("}")
       ),
 
     // Each arm: pattern: statement  (one statement only — no if/else ambiguity)
@@ -340,7 +340,7 @@ module.exports = grammar({
       seq(
         token.immediate("&{"),
         field("variable", $.identifier),
-        "}"
+        token.immediate("}")
       ),
 
     // --- Char ---
