@@ -8,5 +8,5 @@ repository = "https://github.com/dylanisaiahp/luma"
 
 [grammars.luma]
 repository = "https://github.com/dylanisaiahp/luma"
-rev = "3a21cb1aed7d4c756ff85c28b9bc13905da6363c"
+rev = "da64cb31b211c6dad46dfce6901b1acde848d595"
 path = "editor/tree-sitter-luma"
