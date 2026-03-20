@@ -1,44 +1,52 @@
-; Keywords
+; Keywords — purple
 [
   "if" "else" "while" "for" "in" "match"
   "return" "break" "raise" "not"
   "use" "module" "struct"
 ] @keyword
 
-; Types
+; Types — light blue
 [
   "int" "float" "string" "bool" "char" "void"
   "maybe" "worry" "list" "table"
 ] @type
 
-; Literals
+; Builtins — light blue (same as types, they're part of the language)
+(call_expression
+  name: (identifier) @function.builtin
+  (#match? @function.builtin "^(print|write|read|input|fetch|file|run|int|float|string|random)$"))
+
+; Literals — darkish orange/yellow
 (boolean) @boolean
 (integer) @number
 (float) @number
 (char_literal) @string.special
+
+; empty — lightish yellow
 (empty) @constant.builtin
 
-; Strings
+; Strings — green
 (string_literal) @string
 (string_content) @string
 (escape_sequence) @string.escape
 
-; Interpolation — &{var} inside strings
+; Interpolation — variable inside &{} colored, braces as punctuation
+(interpolation) @string
 (interpolation
-  (identifier) @variable.special)
+  (identifier) @variable)
 
-; Comments
+; Comments — muted gray
 (comment) @comment
 
-; Functions — declarations
+; Functions — declarations colored
 (function_declaration
   name: (identifier) @function)
 
-; Functions — calls
+; Function calls — colored
 (call_expression
   name: (identifier) @function.call)
 
-; Methods
+; Methods — colored
 (method_call_expression
   method: (identifier) @function.method)
 
@@ -63,7 +71,7 @@
 (use_statement
   module: (identifier) @module)
 
-; Operators
+; Operators — light blue
 [
   "+" "-" "*" "/" "%"
   "==" "!=" ">" "<" ">=" "<="
@@ -75,5 +83,5 @@
 [ "(" ")" "{" "}" ] @punctuation.bracket
 [ ";" "," "." ":" ] @punctuation.delimiter
 
-; Variables — lowest priority, catches everything else
+; Variables — lowest priority
 (identifier) @variable
