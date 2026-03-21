@@ -21,10 +21,14 @@ These are not up for discussion in the rewrite — they are locked.
 - `word` type removed — use `string` or `char`
 - `_` wildcard removed from match — use `else` only
 - `()` no longer valid for empty list/table init — use `empty` keyword only
-- Module system: every importable `.lm` file must declare `module name;` — no filename fallback, module name CAN match filename
-- `luma new --file name` creates a `.lm` file pre-populated with `module name;`
-- `else` is the only match wildcard — patterns are: integer, range, string, set, else
+- Module system: every importable `.lm` file must declare `module name;` — no filename fallback
+- `luma create path/to/file` creates a `.lm` file pre-populated with `module name;`
+- `luma create path/to/dir/` (trailing slash) creates a directory
+- `else` is the only match wildcard — patterns are: integer, range, string, set, ok, error, else
 - Single-quote literals produce `char` only
+- `and`, `or`, `not` are keywords — `&&`, `||`, `!` (standalone) are not valid Luma
+- `!=` stays — it is a comparison operator, not standalone negation
+- `else e {}` error handling syntax removed — replaced by `worry` match (see below)
 
 ---
 
@@ -86,7 +90,7 @@ if x > 10 {
     result = 1
 }
 
-print(result)   # Err:Uninit-Var — result may not be initialized on all paths
+print(result)   # ERR: result may not be initialized on all paths
 ```
 
 ### Rule 3 — Must be used
@@ -102,19 +106,102 @@ float         # 64-bit float
 string        # UTF-8 text
 bool          # true / false
 char          # single Unicode character, single-quote literal 'a'
+generic       # any type — explicit, replaces "any" from other languages
 maybe(T)      # optional value — .exists() / .or(fallback)
-worry(T)      # failable value — raise / else error { }
+worry(T)      # failable value — match ok/error
 list(T)       # ordered collection
 table(K, V)   # key-value collection
 ```
 
-`maybe(T)?` shorthand is planned post-rewrite but not in a0.1.
+### `generic` type
 
-### Collections
+`generic` is explicit — you declare it deliberately when a value genuinely needs to work with any type. It is not a fallback or an escape hatch.
 
-- `list(T)` — immutable by default. `.add()` returns a new list, it does not mutate in place.
-- `table(K, V)` — same immutability model. More methods in rewrite.
-- `empty` — the only way to initialize an empty list or table. `()` is not valid.
+```luma
+generic identity(generic value) {
+    return value;
+}
+
+list(generic) mixed = (1, "hello", true);
+```
+
+Combined with `is`:
+```luma
+generic val = something();
+if val is int {
+    print(val + 1);
+} else if val is string {
+    print(val.upper());
+}
+```
+
+### `is` keyword
+
+`is` checks the type of any value. Works on primitives, structs, `ok`, `error`, `maybe`, `generic` — everything.
+
+```luma
+if x is int {
+if name is string {
+if result is ok {
+if result is error {
+if value is maybe {
+```
+
+`.is(type)` also works as a method — both forms are valid:
+
+```luma
+if x.is(int) {
+if result.is(ok) {
+```
+
+---
+
+## Error Handling
+
+### `worry(T)`
+
+A `worry(T)` is either ok with a value of type `T`, or an error with a string message. There is no magic conversion — if a function returns `worry(int)`, the result is a `worry(int)` until explicitly handled.
+
+```luma
+worry(int) safe_divide(int a, int b) {
+    if b == 0 {
+        raise "cannot divide by zero";
+    }
+    return a / b;
+}
+```
+
+### Handling with match
+
+```luma
+worry(int) result = safe_divide(10, 2);
+
+match result {
+    ok: print(result.value);
+    error: print(result.message);
+}
+```
+
+- `ok` and `error` are match patterns specific to `worry` types
+- `result.value` — the inner value. Runtime error if called on error state: "`.value` can't be called on error — check `is ok` first"
+- `result.message` — the error string. Runtime error if called on ok state
+- `else` is optional for `worry` match — `ok` and `error` are exhaustive
+- Compiler warns if neither `ok` nor `error` is handled
+
+### Checking with `is`
+
+```luma
+if result is ok {
+    print(result.value);
+}
+if result is error {
+    print(result.message);
+}
+```
+
+### The old `else e {}` syntax is removed
+
+The previous syntax was implicit and inconsistent. `worry` match replaces it entirely.
 
 ---
 
@@ -124,6 +211,23 @@ table(K, V)   # key-value collection
 
 `.len()` `.upper()` `.lower()` `.trim()` `.reverse()` `.chars()` `.contains()` `.starts_with()` `.ends_with()` `.repeat()` `.replace()` `.split()` `.first()` `.last()` `.as(type)` `.exists()`
 
+### int / float
+
+`.abs()` `.to_float()` / `.to_int()` `.to_string()` `.exists()` `.pow()` `.floor()` `.ceil()` `.round()`
+
+`.with(format)` — format as a display string, always returns `string`. Lives on `int` and `float` only — not on `string`. Formatting is a numeric concern.
+
+```luma
+int price = 1299;
+price.with("$");     # "$1,299"
+price.with(",");     # "1,299"
+price.with("€");     # "€1,299"
+
+float bytes = 1073741824.0;
+bytes.with("GB");    # "1.00 GB"
+bytes.with("MB");    # "1,024 MB"
+```
+
 ### List
 
 `.len()` `.get(i)` `.contains()` `.where()` `.add()` `.remove(i)` `.reverse()` `.sort()` `.first()` `.last()` `.merge(glue)` `.exists()`
@@ -131,6 +235,16 @@ table(K, V)   # key-value collection
 ### Table
 
 `.len()` `.get(key)` `.has(key)` `.set(key, val)` `.remove(key)` `.keys()` `.values()` `.exists()`
+
+### maybe(T)
+
+`.exists()` `.or(fallback)` `.is(type)`
+
+### worry(T)
+
+`.value` — inner value (ok only)
+`.message` — error string (error only)
+`.is(ok)` `.is(error)`
 
 ### input()
 
@@ -150,7 +264,6 @@ file("path").exists()
 file("path/").list(".")       # all files
 file("path/").list(".lm")     # by extension
 file("path/").list("/")       # dirs only
-file("path/").list("/sub/")   # subdir contents
 ```
 
 ### fetch()
@@ -162,135 +275,60 @@ fetch("https://...").send("body")
 
 ---
 
-## Error and Warning System
+## Match Statements
 
-### Design goals
+Patterns: integer, range, string, set, `ok`, `error`, `else`
 
-The error system in a0.1 was a foundation. The rewrite replaces it completely with these goals:
+```luma
+# scalar match — else required
+match val {
+    1: print("one");
+    range(2, 5): print("small");
+    ("quit", "exit"): print("goodbye");
+    else: print("other");
+}
 
-- **No generic errors** — every diagnostic has a specific code, message, span, and actionable hint. A fallback "something went wrong" message will not exist.
-- **Cross-file diagnostics** — errors must show the correct file, line, and column regardless of which file in the module chain triggered them. The current a0.1 implementation can fail silently, point at a `use` statement rather than the actual error site, or produce a Rust backtrace. None of these are acceptable.
-- **Every error is recoverable** — the compiler collects all errors before reporting, never stops at the first one.
-- **Errors and warnings always surface** — on every `luma` command, not just `luma check`.
-- **Hints are prescriptive** — they tell the programmer exactly what to change, not just what went wrong.
+# worry match — else optional, ok/error are exhaustive
+match result {
+    ok: print(result.value);
+    error: print(result.message);
+}
 
-### Diagnostic codes
-
-Codes use an `Err:` or `Warn:` prefix followed by a short title-case slug. This keeps them self-documenting without being verbose, and title case means Luma is talking to you, not shouting.
-
+# list match — fires all matching arms per element
+match flags {
+    ("verbose", "v"): print("verbose on");
+    ("time", "t"): print("time on");
+    else: print("unknown flag");
+}
 ```
-[Err:Type-Mismatch]
-[Err:Undef-Var]
-[Err:Convert-Fail]
-[Err:Missing-Semi]
-[Err:Uninit-Var]
-[Err:Div-By-Zero]
-[Err:Unknown-Func]
-[Err:Wrong-Arg-Count]
-[Err:Not-A-Bool]
-[Err:Unterminated-String]
-[Warn:Unused-Var]
-[Warn:Unused-Import]
-[Warn:Unused-Func]
-[Warn:Void-Returns-Value]
-```
-
-The format is locked. The specific slugs are not — if a slug is unclear or gets complaints it can be renamed without touching diagnostic logic.
-
-### Diagnostic appearance
-
-Each diagnostic renders in layers with distinct colors, designed to feel calm and teacherly rather than alarming:
-
-```
-[Err:Type-Mismatch] Type mismatch: expected int, got string    ← pastel red
-   --> main.lm:3:9                                             ← cyan
-
- 3 │   int x = "hello";                                        ← neutral/dimmed
-           ~~~~~~~
-           Use a string variable, or change the type to string. ← soft blue or muted green
-```
-
-```
-[Warn:Unused-Var] Unused variable: 'result'                    ← warm light yellow
-   --> main.lm:5:9                                             ← cyan
-
- 5 │   int result = 0;                                         ← neutral/dimmed
-           ~~~~~~
-           If you meant to ignore it, prefix with underscore: _result ← soft blue or muted green
-```
-
-Color intent:
-- **Error label + message** — pastel red. Noticeable but not aggressive.
-- **Warning label + message** — warm light yellow. Informational, not urgent.
-- **File/location arrow** — cyan.
-- **Source line** — neutral, dimmed. Context, not the focus.
-- **Hint** — soft blue or muted green. Feels like a suggestion, not a command.
-
-The color scheme is the current direction, not a hard lock. The palette lives in one place in `luma-core/diagnostics` and can be adjusted without touching any diagnostic logic.
-
-### Diagnostic shape
-
-Every diagnostic carries:
-- Code — `Err:Slug` or `Warn:Slug`
-- Severity
-- Message — what went wrong, in plain language
-- Span — filename, line, column, length (always accurate, even across files)
-- Source line — the actual text at that location
-- Hint — what to do about it, prescriptive and specific
-
-### Cross-file requirement
-
-When a module is `use`d and contains an error, the diagnostic must point to the exact location in the module file — not to the `use` statement in the importing file. The `luma-core` diagnostics module owns all span tracking and must thread spans through the entire pipeline so that all errors always resolve to their true source location.
-
-### Always visible
-
-Errors and warnings surface on every `luma` command — they are not debug output.
-
----
-
-## Debug System
-
-`luma debug` is its own command with 5 levels:
-
-- **Level 1** — errors only
-- **Level 2** — errors + warnings
-- **Level 3** — + scope changes, variable declarations
-- **Level 4** — + every expression evaluated, every function call with args/return
-- **Level 5** — everything: tokens, AST nodes, scope push/pop, every variable lookup
-
-Goal: never need to add a print statement to debug Luma code.
-
-The debug system must be cross-file aware — when tracing execution across module boundaries, the debug output shows which file each event came from.
 
 ---
 
 ## Rewrite Architecture
 
-### Four repos
+### Repo structure
 
 ```
-luma-core  → lexer, parser, AST, analysis, diagnostics
-luma-comp  → codegen (AST → Rust), loads luma-core
-luma-cli   → CLI orchestration, loads luma-comp
-luma-lsp   → language server, loads luma-core
+luma-lang/
+    core/        ← AST, lexer, parser, analysis, diagnostics (depends on nothing)
+    comp/        ← compiler, AST → Rust → binary (depends on core)
+    interface/   ← CLI commands (depends on comp)
+    lsp/         ← language server (depends on core only)
+    bridge/      ← universal bindings for other languages
+    migrate/     ← version migration between Luma versions
+    weave/       ← convert to/from other languages
+    examples/
 ```
 
 ### Dependency graph
 
 ```
-luma-core
-   ↑      ↑
-luma-comp  luma-lsp
-   ↑
-luma-cli
+core
+  ↑    ↑    ↑      ↑       ↑
+comp  lsp  bridge migrate weave
+  ↑
+interface
 ```
-
-**Rules:**
-- `luma-core` depends on nothing
-- `luma-comp` depends only on core
-- `luma-cli` depends only on comp
-- `luma-lsp` depends only on core
-- No reverse dependencies ever
 
 ### Compiler pipeline
 
@@ -309,7 +347,37 @@ luma-cli
 - **Strict phase separation** — no phase calls into a later phase
 - **Spans everywhere** — every token, AST node, and error has file + line + col
 - **No generic errors** — every diagnostic is specific, with code, span, and hint
-- **Cross-file correctness** — spans always resolve to the actual source file, never to an import site
+- **Cross-file correctness** — spans always resolve to the actual source file
+
+---
+
+## Error System
+
+### Error codes
+- `ERR-N` for errors
+- `WARN-N` for warnings
+- No leading zeros, no artificial ceiling
+- Every error has a unique code, specific message, span, and actionable hint
+
+### No generic errors
+`ERR-16: something went wrong at runtime` will not exist in the rewrite. Every possible failure has a specific message.
+
+### Always visible
+Errors and warnings surface on every `luma` command — they are not debug output.
+
+---
+
+## Debug System
+
+`luma debug` is its own command with 5 levels:
+
+- **Level 1** — errors only
+- **Level 2** — errors + warnings
+- **Level 3** — + scope changes, variable declarations
+- **Level 4** — + every expression evaluated, every function call with args/return
+- **Level 5** — everything: tokens, AST nodes, scope push/pop, every variable lookup
+
+Goal: never need to add a print statement to debug Luma code.
 
 ---
 
@@ -317,30 +385,59 @@ luma-cli
 
 ### v1 (Rust, current repo)
 ```
-luma new               ← done (git init + .gitignore + source/ + luma.toml + README)
-luma new --file name   ← done (creates name.lm with module name; declaration)
-luma run               ← done
-luma check             ← done
-luma build             ← TODO (v1 compiler: AST → Rust codegen → binary via rustc)
+luma new <name>       ← scaffold project
+luma create <path>    ← create .lm file or directory
+luma run              ← interpret from luma.toml entry
+luma run <file>       ← interpret specific file
+luma build            ← compile to binary (TODO)
+luma check <file>     ← parse + check, no execution
 ```
 
 ### v2 (post-rewrite, luma-cli in Luma)
 ```
-luma new      ← same + improved
-luma init     ← initialize existing directory
-luma run      ← interpret or compile + run
-luma build    ← compile to native binary
-luma check    ← parse + type check
-luma debug    ← debug with levels 1-5
-luma test     ← run #T annotations, compare output
-luma tidy     ← format + lint
-luma add      ← add dependency
-luma remove   ← remove dependency
-luma update   ← update Luma or dependencies
-luma info     ← show project info
-luma search   ← search registry (post-website)
-luma install  ← install components e.g. LSP (post-website)
+luma / luma help          ← full help
+luma help <command>       ← help for specific command
+luma docs                 ← print docs URL, prompt for topic
+luma docs <topic>         ← reference for that topic (read, errors, worry, etc.)
+luma new                  ← scaffold project
+luma init                 ← initialize existing directory
+luma create               ← create .lm file or directory
+luma run                  ← interpret or compile + run
+luma build                ← compile to native binary
+luma check                ← parse + type check
+luma debug                ← debug with levels 1-5
+luma test                 ← run #T annotations, compare output
+luma tidy                 ← format + lint
+luma add                  ← add dependency
+luma remove               ← remove dependency
+luma update               ← update Luma or dependencies
+luma info                 ← show project info
+luma migrate              ← migrate project between Luma versions
+luma weave                ← convert to/from other languages
+luma search               ← search registry (post-website)
+luma install              ← install components e.g. LSP (post-website)
 ```
+
+### Documentation tiers
+
+Luma has two tiers of documentation:
+
+**Docs** — verbose, explanatory, for learning. Full prose, examples, context.
+
+**Reference** — terse, scannable, for when you already know the language:
+
+```
+read() — reads a line from stdin, returns string
+
+  string line = read();
+
+  .trim()    → string   remove leading/trailing whitespace
+  .upper()   → string   uppercase
+  .lower()   → string   lowercase
+  .split()   → list     split on whitespace
+```
+
+`luma docs read` prints the reference entry for `read`. `luma docs` prints the website URL and prompts for a topic.
 
 ---
 
@@ -384,9 +481,9 @@ Advanced users can place `.rs`, `.py`, `.go` etc. files in a `native/` folder al
 ```
 mylib-lm/
   source/
-    api.lm           ← Luma API users call
+    api.lm
   native/
-    bindings.rs      ← Rust (or other language) internals
+    bindings.rs
   luma.toml
   [native.deps]
     winit = "0.30"
@@ -410,90 +507,98 @@ utils = { path = "./lib/utils" }
 [dev.deps]
 testhelper = { path = "./tools/testhelper" }
 
-[native.deps]          # experimental, advanced users only
+[native.deps]
 winit = { git = "https://github.com/rust-windowing/winit" }
 ```
 
 ---
 
+## Editor Support
+
+The current repo contains a tree-sitter grammar and Zed extension as a development aid for the rewrite period only. These are not maintained and will be retired when `luma-lang/lsp/` is complete.
+
+The LSP (`luma-lang/lsp/`) replaces all tree-sitter grammars — one language server works in Zed, VS Code, Neovim, Helix, and everything else.
+
+---
+
 ## Repo Directory Layout
 
-### luma-core
+### luma-lang/core/
 ```
-luma-core/
-  source/
+source/
     lexer/
-      lexer.lm
-      token.lm
-      exports.lm    ← module lexer;
+        lexer.lm
+        token.lm
+        exports.lm    ← module lexer;
     parser/
-      parser.lm
-      exports.lm    ← module parser;
+        parser.lm
+        exports.lm    ← module parser;
     ast/
-      expr.lm
-      stmt.lm
-      decl.lm
-      exports.lm    ← module ast;
+        expr.lm
+        stmt.lm
+        decl.lm
+        exports.lm    ← module ast;
     analysis/
-      symbols.lm
-      types.lm
-      exports.lm    ← module analysis;
+        symbols.lm
+        types.lm
+        exports.lm    ← module analysis;
     diagnostics/
-      error.lm
-      span.lm
-      exports.lm    ← module diagnostics;
-    main.lm         ← use lexer; use parser; use ast; etc.
-  luma.toml
+        error.lm
+        span.lm
+        exports.lm    ← module diagnostics;
+    main.lm
+luma.toml
 ```
 
-### luma-comp
+### luma-lang/comp/
 ```
-luma-comp/
-  source/
+source/
     loader/
-      project.lm
-      modules.lm
-      exports.lm    ← module loader;
+        project.lm
+        modules.lm
+        exports.lm    ← module loader;
     codegen/
-      emit_expr.lm
-      emit_stmt.lm
-      emit_types.lm
-      emitter.lm
-      exports.lm    ← module codegen;
-    main.lm         ← use loader; use codegen; etc.
-  luma.toml
+        emit_expr.lm
+        emit_stmt.lm
+        emit_types.lm
+        emitter.lm
+        exports.lm    ← module codegen;
+    main.lm
+luma.toml
 ```
 
-### luma-cli
+### luma-lang/interface/
 ```
-luma-cli/
-  source/
+source/
     commands/
-      run.lm
-      build.lm
-      check.lm
-      new.lm
-      debug.lm
-      test.lm
-      tidy.lm
-      add.lm
-      exports.lm    ← module commands;
-    main.lm         ← use commands;
-  luma.toml
+        run.lm
+        build.lm
+        check.lm
+        new.lm
+        create.lm
+        debug.lm
+        test.lm
+        tidy.lm
+        add.lm
+        docs.lm
+        migrate.lm
+        weave.lm
+        exports.lm    ← module commands;
+    main.lm
+luma.toml
 ```
 
-### luma-lsp
+### luma-lang/lsp/
 ```
-luma-lsp/
-  source/
+source/
     protocol/
-      message.lm
-      exports.lm    ← module protocol;
+        message.lm
+        exports.lm    ← module protocol;
     features/
-      diagnostics.lm
-      hover.lm
-      completion.lm
-      exports.lm    ← module features;
-    main.lm         ← use protocol; use features;
-  luma.toml
+        diagnostics.lm
+        hover.lm
+        completion.lm
+        exports.lm    ← module features;
+    main.lm
+luma.toml
 ```
