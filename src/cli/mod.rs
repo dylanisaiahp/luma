@@ -17,12 +17,11 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Create a new Luma project or file
-    New {
-        name: String,
-        #[arg(long, help = "Create a single .lm file instead of a project")]
-        file: bool,
-    },
+    /// Create a new Luma project
+    New { name: String },
+
+    /// Create a new .lm file or directory
+    Create { path: String },
 
     /// Run a Luma file or project
     #[command(trailing_var_arg = true)]
@@ -46,7 +45,6 @@ pub enum Commands {
     Check { file: String },
 }
 
-/// Parsed luma.toml
 #[derive(Debug)]
 struct LumaToml {
     #[allow(dead_code)]
@@ -100,15 +98,14 @@ fn parse_toml_string(line: &str, key: &str) -> Option<String> {
     Some(rest.to_string())
 }
 
+fn print_step(label: &str) {
+    println!("{:<36} done.", label);
+}
+
 pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     match command {
-        Commands::New { name, file } => {
-            if file {
-                create_file_lm(&name)
-            } else {
-                create_project(&name)
-            }
-        }
+        Commands::New { name } => create_project(&name),
+        Commands::Create { path } => create_path(&path),
         Commands::Run {
             file,
             time,
@@ -129,7 +126,6 @@ pub fn execute_command(command: Commands) -> anyhow::Result<()> {
     }
 }
 
-/// Read luma.toml in the current directory and resolve the entry file path.
 fn resolve_entry_from_toml() -> anyhow::Result<String> {
     let toml_path = Path::new("luma.toml");
     if !toml_path.exists() {
@@ -187,20 +183,11 @@ fn search_dir(dir: &Path, filename: &str) -> Option<PathBuf> {
     None
 }
 
-/// Resolve a `use` module name to a file path.
-///
-/// Rules (new system):
-///   - Scan source/ recursively for a file containing `module <name>;`
-///   - The module declaration file CAN have the same name as the module (e.g. parser.lm with module parser;)
-///   - No filename fallback — every importable file must declare its module name
-///   - Check same directory as the importing file as a final fallback
 fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
-    // 1. Scan source/ for a file declaring `module <name>;`
     if let Some(path) = find_module_declaration(Path::new("source"), module_name) {
         return Some(path);
     }
 
-    // 2. Same directory as importing file
     if let Some(parent) = Path::new(importing_file).parent()
         && let Some(path) = find_module_declaration(parent, module_name)
     {
@@ -210,7 +197,6 @@ fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
     None
 }
 
-/// Recursively search dir for a .lm file that contains `module <name>;`
 fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
     let entries = fs::read_dir(dir).ok()?;
     for entry in entries.flatten() {
@@ -231,8 +217,6 @@ fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
     None
 }
 
-/// Load all statements from a use chain starting at `file_path`.
-/// Handles `use` statements recursively, avoiding cycles.
 fn load_with_uses(
     file_path: &str,
     visited: &mut std::collections::HashSet<String>,
@@ -279,42 +263,36 @@ fn load_with_uses(
         collector.add_parse_error(error);
     }
 
-    // Expand use statements
     let mut expanded: Vec<Stmt> = Vec::new();
     for stmt in statements {
         match &stmt {
-            Stmt::Use { module, items } => {
-                match resolve_use(module, file_path) {
-                    Some(mod_path) => {
-                        let mod_path_str = mod_path.to_string_lossy().to_string();
-                        let mut mod_stmts =
-                            load_with_uses(&mod_path_str, visited, collector, debug);
+            Stmt::Use { module, items } => match resolve_use(module, file_path) {
+                Some(mod_path) => {
+                    let mod_path_str = mod_path.to_string_lossy().to_string();
+                    let mut mod_stmts = load_with_uses(&mod_path_str, visited, collector, debug);
 
-                        // Selective import: use http.(client, request)
-                        if let Some(selected) = items {
-                            mod_stmts.retain(|s| match s {
-                                Stmt::Function { name, .. } => selected.contains(name),
-                                Stmt::StructDeclaration { name, .. } => selected.contains(name),
-                                _ => true,
-                            });
-                        }
-
-                        // Skip ModuleDeclaration stmts — metadata only
-                        for s in mod_stmts {
-                            if !matches!(s, Stmt::ModuleDeclaration { .. }) {
-                                expanded.push(s);
-                            }
-                        }
+                    if let Some(selected) = items {
+                        mod_stmts.retain(|s| match s {
+                            Stmt::Function { name, .. } => selected.contains(name),
+                            Stmt::StructDeclaration { name, .. } => selected.contains(name),
+                            _ => true,
+                        });
                     }
-                    None => {
-                        eprintln!(
-                            "[!] Could not resolve module '{}' (imported in '{}')\n    \
-                             Make sure the file contains: module {};",
-                            module, file_path, module
-                        );
+
+                    for s in mod_stmts {
+                        if !matches!(s, Stmt::ModuleDeclaration { .. }) {
+                            expanded.push(s);
+                        }
                     }
                 }
-            }
+                None => {
+                    eprintln!(
+                        "[!] Could not resolve module '{}' (imported in '{}')\n    \
+                             Make sure the file contains: module {};",
+                        module, file_path, module
+                    );
+                }
+            },
             _ => expanded.push(stmt),
         }
     }
@@ -326,27 +304,35 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     let path = Path::new(name);
 
     if path.exists() {
-        anyhow::bail!("Directory '{}' already exists", name);
+        anyhow::bail!("[!] Tried to create {}/ but it already exists", name);
     }
 
+    print_step(&format!("creating {}/", name));
     fs::create_dir(path)?;
+
+    print_step(&format!("creating {}/source/", name));
     fs::create_dir(path.join("source"))?;
 
+    print_step(&format!("creating {}/source/main.lm", name));
     let main_content = "void main() {\n    print(\"Hello, Luma!\");\n}\n";
     fs::write(path.join("source/main.lm"), main_content)?;
 
+    print_step(&format!("creating {}/luma.toml", name));
     let toml_content = format!(
         "[project]\nname = \"{}\"\nversion = \"0.1.0\"\ndescription = \"\"\nentry = \"source/main.lm\"\n",
         name
     );
     fs::write(path.join("luma.toml"), toml_content)?;
 
+    print_step(&format!("creating {}/README.md", name));
     let readme = format!("# {}\n\nA Luma project.\n", name);
     fs::write(path.join("README.md"), readme)?;
 
-    let gitignore = "# Luma build output\n.luma/\n\n# OS\n.DS_Store\nThumbs.db\n";
+    print_step(&format!("creating {}/.gitignore", name));
+    let gitignore = "# Luma build output\nbuilds/\n\n# OS\n.DS_Store\nThumbs.db\n";
     fs::write(path.join(".gitignore"), gitignore)?;
 
+    let git_label = "initializing git";
     let git_result = std::process::Command::new("git")
         .arg("init")
         .current_dir(path)
@@ -354,37 +340,76 @@ fn create_project(name: &str) -> anyhow::Result<()> {
 
     match git_result {
         Ok(output) if output.status.success() => {
-            println!("[✓] Created new Luma project: {}", name);
-            println!("    cd {}", name);
-            println!("    luma run");
-            println!("    git initialized");
+            print_step(git_label);
+            println!();
+            println!("{} created successfully ✓", name);
+            println!("git initialized ✓");
+            println!();
+            println!("next -> cd {} && luma run", name);
         }
         _ => {
-            println!("[✓] Created new Luma project: {}", name);
-            println!("    cd {}", name);
-            println!("    luma run");
-            println!("    [!] git init failed — is git installed?");
+            println!("{:<36} failed.", git_label);
+            println!();
+            println!("{} created successfully ✓", name);
+            println!("[!] git init failed — is git installed?");
+            println!();
+            println!("next -> cd {} && luma run", name);
         }
     }
 
     Ok(())
 }
 
-/// Create a single .lm file with a module declaration at the top.
-fn create_file_lm(name: &str) -> anyhow::Result<()> {
-    // Strip .lm extension if provided, derive module name from filename stem
-    let stem = name.trim_end_matches(".lm");
-    let filename = format!("{}.lm", stem);
-    let path = Path::new(&filename);
-
-    if path.exists() {
-        anyhow::bail!("File '{}' already exists", filename);
+/// Create a .lm file or a directory.
+/// Trailing slash → directory only.
+/// No trailing slash → .lm file with module declaration.
+fn create_path(raw_path: &str) -> anyhow::Result<()> {
+    // Directory: trailing slash
+    if raw_path.ends_with('/') {
+        let dir_path = Path::new(raw_path);
+        if dir_path.exists() {
+            anyhow::bail!("[!] Tried to create {} but it already exists", raw_path);
+        }
+        print_step(&format!("creating {}", raw_path));
+        fs::create_dir_all(dir_path)?;
+        println!();
+        println!("{} created successfully ✓", raw_path);
+        return Ok(());
     }
 
-    let content = format!("module {};\n", stem);
+    // File: strip .lm if provided, then add it back
+    let stem = raw_path.trim_end_matches(".lm");
+    let file_path = format!("{}.lm", stem);
+    let path = Path::new(&file_path);
+
+    if path.exists() {
+        anyhow::bail!("[!] Tried to create {} but it already exists", file_path);
+    }
+
+    // Create parent directories if needed
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        print_step(&format!("creating {}/", parent.display()));
+        fs::create_dir_all(parent)?;
+    }
+
+    // Module name is the filename stem only, not the full path
+    let module_name = Path::new(stem)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(stem);
+
+    print_step(&format!("creating {}", file_path));
+    let content = format!("module {};\n", module_name);
     fs::write(path, &content)?;
 
-    println!("[✓] Created {}", filename);
+    println!();
+    println!("{} created successfully ✓", file_path);
+    println!();
+    println!("next -> use {};", module_name);
+
     Ok(())
 }
 
