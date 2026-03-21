@@ -25,8 +25,8 @@ void main() {
     print(done);
     done = true;
     print(done);
-    print(true && false);
-    print(true || false);
+    print(true and false);
+    print(true or false);
     print(not true);
 
     # string

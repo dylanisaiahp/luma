@@ -49,8 +49,8 @@ void main() {
     # logical operators
     bool a = true;
     bool b = false;
-    print(a && b);
-    print(a || b);
+    print(a and b);
+    print(a or b);
     print(not a);
 
     # modulo

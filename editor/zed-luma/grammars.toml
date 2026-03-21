@@ -1,4 +1,0 @@
-[grammars.luma]
-repository = "https://github.com/dylanisaiahp/luma"
-commit = "HEAD"
-path = "editor/tree-sitter-luma"

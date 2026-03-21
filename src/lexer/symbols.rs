@@ -91,8 +91,9 @@ impl Lexer {
             '&' => {
                 self.read_char();
                 if self.ch == '&' {
+                    // "&&" — use 'and' keyword instead
                     self.read_char();
-                    Ok(TokenKind::And)
+                    Err(LexerError::UnexpectedCharacter('&', line, col))
                 } else if self.ch == '{' {
                     self.read_char(); // skip '{'
                     let position = self.position;
@@ -112,8 +113,9 @@ impl Lexer {
             '|' => {
                 self.read_char();
                 if self.ch == '|' {
+                    // "||" — use 'or' keyword instead
                     self.read_char();
-                    Ok(TokenKind::Or)
+                    Err(LexerError::UnexpectedCharacter('|', line, col))
                 } else {
                     Err(LexerError::UnexpectedCharacter('|', line, col))
                 }
