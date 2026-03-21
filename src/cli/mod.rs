@@ -217,10 +217,13 @@ fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
     None
 }
 
+/// Load a file and all its transitive `use` dependencies.
+/// Each file gets its own ErrorCollector so spans are always accurate.
+/// All collectors are pushed into `collectors` for printing after loading.
 fn load_with_uses(
     file_path: &str,
     visited: &mut std::collections::HashSet<String>,
-    collector: &mut ErrorCollector,
+    collectors: &mut Vec<ErrorCollector>,
     debug: &DebugConfig,
 ) -> Vec<Stmt> {
     let canonical = fs::canonicalize(file_path)
@@ -239,6 +242,9 @@ fn load_with_uses(
             return Vec::new();
         }
     };
+
+    // Each file gets its own collector — spans point to the correct file and source line
+    let mut collector = ErrorCollector::new(&source, file_path);
 
     let mut lexer = crate::lexer::Lexer::new(&source);
     let (tokens, lex_errors) = lexer.tokenize();
@@ -269,7 +275,7 @@ fn load_with_uses(
             Stmt::Use { module, items } => match resolve_use(module, file_path) {
                 Some(mod_path) => {
                     let mod_path_str = mod_path.to_string_lossy().to_string();
-                    let mut mod_stmts = load_with_uses(&mod_path_str, visited, collector, debug);
+                    let mut mod_stmts = load_with_uses(&mod_path_str, visited, collectors, debug);
 
                     if let Some(selected) = items {
                         mod_stmts.retain(|s| match s {
@@ -297,6 +303,7 @@ fn load_with_uses(
         }
     }
 
+    collectors.push(collector);
     expanded
 }
 
@@ -360,11 +367,7 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Create a .lm file or a directory.
-/// Trailing slash → directory only.
-/// No trailing slash → .lm file with module declaration.
 fn create_path(raw_path: &str) -> anyhow::Result<()> {
-    // Directory: trailing slash
     if raw_path.ends_with('/') {
         let dir_path = Path::new(raw_path);
         if dir_path.exists() {
@@ -377,7 +380,6 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // File: strip .lm if provided, then add it back
     let stem = raw_path.trim_end_matches(".lm");
     let file_path = format!("{}.lm", stem);
     let path = Path::new(&file_path);
@@ -386,7 +388,6 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
         anyhow::bail!("[!] Tried to create {} but it already exists", file_path);
     }
 
-    // Create parent directories if needed
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
         && !parent.exists()
@@ -395,7 +396,6 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
         fs::create_dir_all(parent)?;
     }
 
-    // Module name is the filename stem only, not the full path
     let module_name = Path::new(stem)
         .file_name()
         .and_then(|s| s.to_str())
@@ -416,15 +416,18 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
 fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
     let start = Instant::now();
 
-    let source = fs::read_to_string(file)?;
-    let mut collector = ErrorCollector::new(&source, file);
-
     let mut visited = std::collections::HashSet::new();
-    let statements = load_with_uses(file, &mut visited, &mut collector, &debug);
+    let mut collectors: Vec<ErrorCollector> = Vec::new();
 
-    if collector.has_errors() {
+    let statements = load_with_uses(file, &mut visited, &mut collectors, &debug);
+
+    // Check parse/lex errors across all files before running
+    let has_parse_errors = collectors.iter().any(|c| c.has_errors());
+    if has_parse_errors {
         println!();
-        collector.print_all();
+        for collector in &collectors {
+            collector.print_all();
+        }
         std::process::exit(1);
     }
 
@@ -432,7 +435,10 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
     let mut interpreter = crate::interpreter::Interpreter::new();
     interpreter.debug_mode = debug.interpreter || debug.lexer || debug.parser;
 
-    match interpreter.interpret(&ast, &source, file) {
+    let entry_source = fs::read_to_string(file).unwrap_or_default();
+    let mut runtime_collector = ErrorCollector::new(&entry_source, file);
+
+    match interpreter.interpret(&ast, &entry_source, file) {
         Ok(()) => {
             if debug.interpreter {
                 interpreter.debug.print_debug(debug.verbose);
@@ -440,8 +446,16 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
             for line in &interpreter.output_buffer {
                 println!("{}", line);
             }
+            // Route warnings to the correct file's collector
             for warning in interpreter.take_warnings() {
-                collector.add_warning(warning);
+                let target = collectors
+                    .iter_mut()
+                    .find(|c| c.filename == warning.span.filename);
+                if let Some(c) = target {
+                    c.add_warning(warning);
+                } else {
+                    runtime_collector.add_warning(warning);
+                }
             }
         }
         Err(e) => {
@@ -451,16 +465,19 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
             for line in &interpreter.output_buffer {
                 println!("{}", line);
             }
-            collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
+            runtime_collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
         }
     }
 
-    if collector.has_errors() {
-        println!();
+    // Print all per-file collectors first, then runtime
+    for collector in &collectors {
+        collector.print_all();
     }
-    collector.print_all();
+    if runtime_collector.has_errors() || !runtime_collector.warnings.is_empty() {
+        runtime_collector.print_all();
+    }
 
-    if collector.has_errors() {
+    if runtime_collector.has_errors() {
         std::process::exit(1);
     }
 
