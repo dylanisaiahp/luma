@@ -25,6 +25,7 @@ impl Codegen {
 
     pub fn generate(mut self, stmts: &[Stmt]) -> String {
         // File header
+        self.emit_line("#![allow(unused_mut, unused_variables, unused_must_use)]");
         self.emit_line("mod luma_runtime;");
         self.emit_line("use luma_runtime::*;");
         self.emit_line("");
@@ -363,7 +364,7 @@ impl Codegen {
                 format!("Value::Char('{}')", c.escape_default())
             }
 
-            ExprKind::Identifier(name) => name.clone(),
+            ExprKind::Identifier(name) => format!("{}.clone()", name),
 
             ExprKind::Interpolation(ident) => {
                 format!("Value::String(format!(\"{{}}\", {}))", ident)
