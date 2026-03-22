@@ -8,7 +8,7 @@ void main() {
 }
 ```
 
-> **Note:** This is the reference implementation (a0.1) — a Rust-based interpreter. A rewrite in Luma itself is planned for a0.2. This repo will be archived once the rewrite is complete.
+> **This is the archived reference implementation (a0.1)** — a Rust-based tree-walking interpreter. The rewrite in Luma itself (`luma-lang/`) is the active project. This repo is kept as a historical reference.
 
 ---
 
@@ -37,7 +37,8 @@ cp target/release/luma ~/.local/bin/luma
 
 ```bash
 luma new myproject        # Create a new project
-luma new --file mymod     # Create a single .lm file with module declaration
+luma create source/mymod  # Create a .lm file with module declaration
+luma create source/mydir/ # Create a directory
 luma run                  # Run from luma.toml entry point
 luma run main.lm          # Run a specific file
 luma check main.lm        # Check for errors without running
@@ -110,11 +111,11 @@ worry(int) safe_divide(int a, int b) {
 }
 
 void main() {
-    int result = safe_divide(10, 0) else err {
-        print(err);
-        return;
-    };
-    print(result);
+    worry(int) result = safe_divide(10, 0);
+    match result {
+        ok: print(result.value);
+        error: print(result.message);
+    }
 }
 ```
 
@@ -174,18 +175,6 @@ Luma tries to tell you exactly what went wrong and how to fix it:
    │                ╰── Make sure the value type matches the variable declaration.
 ───╯
 ```
-
----
-
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md) for what's done and what's coming.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
