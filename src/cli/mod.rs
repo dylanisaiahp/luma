@@ -43,6 +43,15 @@ pub enum Commands {
 
     /// Check a Luma file for errors
     Check { file: String },
+
+    /// Compile a Luma file or project to a native binary
+    Build {
+        /// File to build (optional — reads luma.toml entry if omitted)
+        file: Option<String>,
+        /// Output binary name (default: program)
+        #[arg(long, default_value = "program")]
+        name: String,
+    },
 }
 
 #[derive(Debug)]
@@ -123,6 +132,13 @@ pub fn execute_command(command: Commands) -> anyhow::Result<()> {
             run_file(&target, time, config)
         }
         Commands::Check { file } => check_file(&file),
+        Commands::Build { file, name } => {
+            let target = match file {
+                Some(f) => f,
+                None => resolve_entry_from_toml()?,
+            };
+            build_file(&target, &name)
+        }
     }
 }
 
@@ -487,6 +503,31 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
     }
 
     Ok(())
+}
+
+fn build_file(file: &str, name: &str) -> anyhow::Result<()> {
+    let mut visited = std::collections::HashSet::new();
+    let mut collectors: Vec<ErrorCollector> = Vec::new();
+    let debug = DebugConfig::none();
+
+    let statements = load_with_uses(file, &mut visited, &mut collectors, &debug);
+
+    // Check for errors before building
+    let has_errors = collectors.iter().any(|c| c.has_errors());
+    if has_errors {
+        println!();
+        for collector in &collectors {
+            collector.print_all();
+        }
+        std::process::exit(1);
+    }
+
+    let options = super::comp::CompileOptions {
+        output_name: name.to_string(),
+        output_dir: "builds".to_string(),
+    };
+
+    super::comp::compile(statements, options)
 }
 
 fn check_file(file: &str) -> anyhow::Result<()> {

@@ -1,6 +1,7 @@
 // src/main.rs
 mod ast;
 mod cli;
+mod comp;
 mod debug;
 mod error;
 mod interpreter;
