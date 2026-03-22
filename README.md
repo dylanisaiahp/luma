@@ -41,6 +41,7 @@ luma create source/mymod  # Create a .lm file with module declaration
 luma create source/mydir/ # Create a directory
 luma run                  # Run from luma.toml entry point
 luma run main.lm          # Run a specific file
+luma build                # Compile to native binary
 luma check main.lm        # Check for errors without running
 luma run --time           # Show execution time
 luma run --debug all      # Debug output
@@ -111,11 +112,11 @@ worry(int) safe_divide(int a, int b) {
 }
 
 void main() {
-    worry(int) result = safe_divide(10, 0);
-    match result {
-        ok: print(result.value);
-        error: print(result.message);
+    int result = safe_divide(10, 2) else e {
+        print(e);
+        return;
     }
+    print(result);
 }
 ```
 
