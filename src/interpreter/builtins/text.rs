@@ -22,6 +22,7 @@ pub fn text_methods(
             Some(Value::Char(c)) => Ok(Value::Boolean(s.contains(*c))),
             _ => Err(RuntimeError {
                 message: "contains() takes one string or char argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -31,6 +32,7 @@ pub fn text_methods(
             Some(Value::Char(c)) => Ok(Value::Boolean(s.starts_with(*c))),
             _ => Err(RuntimeError {
                 message: "starts_with() takes one string or char argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -40,6 +42,7 @@ pub fn text_methods(
             Some(Value::Char(c)) => Ok(Value::Boolean(s.ends_with(*c))),
             _ => Err(RuntimeError {
                 message: "ends_with() takes one string or char argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -48,6 +51,7 @@ pub fn text_methods(
             Some(Value::Integer(n)) if *n >= 0 => Ok(Value::String(s.repeat(*n as usize))),
             _ => Err(RuntimeError {
                 message: "repeat() takes one non-negative integer argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -58,6 +62,7 @@ pub fn text_methods(
             }
             _ => Err(RuntimeError {
                 message: "replace() takes two string arguments: replace(from, to)".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -83,36 +88,39 @@ pub fn text_methods(
             }
             _ => Err(RuntimeError {
                 message: "split() takes one string or char argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
         }),
         "first" => Some(match args.first() {
             Some(Value::String(kind)) if kind == "char" => match s.chars().next() {
-                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
-                None => Ok(Value::Maybe(None)),
+                Some(c) => Ok(Value::Option(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Option(None)),
             },
             None => match s.chars().next() {
-                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
-                None => Ok(Value::Maybe(None)),
+                Some(c) => Ok(Value::Option(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Option(None)),
             },
             _ => Err(RuntimeError {
                 message: "first() takes 'char' as argument, or no argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
         }),
         "last" => Some(match args.first() {
             Some(Value::String(kind)) if kind == "char" => match s.chars().next_back() {
-                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
-                None => Ok(Value::Maybe(None)),
+                Some(c) => Ok(Value::Option(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Option(None)),
             },
             None => match s.chars().next_back() {
-                Some(c) => Ok(Value::Maybe(Some(Box::new(Value::Char(c))))),
-                None => Ok(Value::Maybe(None)),
+                Some(c) => Ok(Value::Option(Some(Box::new(Value::Char(c))))),
+                None => Ok(Value::Option(None)),
             },
             _ => Err(RuntimeError {
                 message: "last() takes 'char' as argument, or no argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -120,30 +128,31 @@ pub fn text_methods(
         "as" => Some(match args.first() {
             Some(Value::String(target)) => match target.as_str() {
                 "int" => match s.trim().parse::<i64>() {
-                    Ok(n) => Ok(Value::Maybe(Some(Box::new(Value::Integer(n))))),
-                    Err(_) => Ok(Value::Maybe(None)),
+                    Ok(n) => Ok(Value::Option(Some(Box::new(Value::Integer(n))))),
+                    Err(_) => Ok(Value::Option(None)),
                 },
                 "float" => match s.trim().parse::<f64>() {
-                    Ok(f) => Ok(Value::Maybe(Some(Box::new(Value::Float(f))))),
-                    Err(_) => Ok(Value::Maybe(None)),
+                    Ok(f) => Ok(Value::Option(Some(Box::new(Value::Float(f))))),
+                    Err(_) => Ok(Value::Option(None)),
                 },
                 "bool" => match s.trim() {
-                    "true" => Ok(Value::Maybe(Some(Box::new(Value::Boolean(true))))),
-                    "false" => Ok(Value::Maybe(Some(Box::new(Value::Boolean(false))))),
-                    _ => Ok(Value::Maybe(None)),
+                    "true" => Ok(Value::Option(Some(Box::new(Value::Boolean(true))))),
+                    "false" => Ok(Value::Option(Some(Box::new(Value::Boolean(false))))),
+                    _ => Ok(Value::Option(None)),
                 },
                 "char" => {
                     if s.chars().count() == 1 {
-                        Ok(Value::Maybe(Some(Box::new(Value::Char(
+                        Ok(Value::Option(Some(Box::new(Value::Char(
                             s.chars().next().unwrap(),
                         )))))
                     } else {
-                        Ok(Value::Maybe(None))
+                        Ok(Value::Option(None))
                     }
                 }
-                "string" => Ok(Value::Maybe(Some(Box::new(Value::String(s.to_string()))))),
+                "string" => Ok(Value::Option(Some(Box::new(Value::String(s.to_string()))))),
                 _ => Err(RuntimeError {
                     message: format!("as() unknown target type '{}'", target),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -152,6 +161,7 @@ pub fn text_methods(
                 message:
                     "as() takes a type argument: as(int), as(float), as(bool), as(char), as(string)"
                         .to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -172,6 +182,7 @@ pub fn string_method(
     } else {
         Err(RuntimeError {
             message: format!("string has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         })
@@ -196,6 +207,7 @@ pub fn char_method(
             } else {
                 Err(RuntimeError {
                     message: format!("char has no method '{}'", method),
+                    file_path: String::new(),
                     line,
                     column,
                 })

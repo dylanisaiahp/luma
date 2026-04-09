@@ -12,7 +12,7 @@ impl Interpreter {
         _column: usize,
     ) -> Result<Value, RuntimeError> {
         let val = self.evaluate_expression(value)?;
-        self.set_variable(name, val.clone());
+        self.set_variable(name, val.clone())?;
         Ok(val)
     }
 
@@ -29,6 +29,7 @@ impl Interpreter {
             None => {
                 return Err(RuntimeError {
                     message: format!("Undefined variable: {}", name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -45,6 +46,7 @@ impl Interpreter {
                 if r == 0 {
                     return Err(RuntimeError {
                         message: "Division by zero".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -58,6 +60,7 @@ impl Interpreter {
                 if r == 0.0 {
                     return Err(RuntimeError {
                         message: "Division by zero".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -82,6 +85,7 @@ impl Interpreter {
                 if r == 0.0 {
                     return Err(RuntimeError {
                         message: "Division by zero".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -92,6 +96,7 @@ impl Interpreter {
                 if r == 0 {
                     return Err(RuntimeError {
                         message: "Division by zero".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -108,13 +113,14 @@ impl Interpreter {
             _ => {
                 return Err(RuntimeError {
                     message: "Type mismatch in compound assignment".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
             }
         };
 
-        self.set_variable(name, result.clone());
+        self.set_variable(name, result.clone())?;
         Ok(result)
     }
 }

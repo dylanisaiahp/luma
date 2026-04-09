@@ -179,6 +179,16 @@ Luma tries to tell you exactly what went wrong and how to fix it:
 
 ---
 
+## Known Limitations
+
+### Match expression freeze in multi-module projects
+
+The `match` expression can freeze when used in complex multi-module projects with many match arms (e.g., 41+ arms). This is due to scope management issues in the interpreter's function call handling when deeply nested across modules.
+
+**Workaround**: Avoid match expressions in the bootstrap interpreter for now. Use if/else chains instead. This limitation will be fixed once Slate (the language being bootstrapped) can compile itself.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

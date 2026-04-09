@@ -17,7 +17,12 @@ pub fn list_method(
                 match items.get(idx) {
                     Some(v) => Ok(v.clone()),
                     None => Err(RuntimeError {
-                        message: format!("list index {} out of bounds (len {})", i, items.len()),
+                        message: format!(
+                            "List index {} out of bounds (list has {} items)",
+                            idx,
+                            items.len()
+                        ),
+                        file_path: String::new(),
                         line,
                         column,
                     }),
@@ -25,6 +30,7 @@ pub fn list_method(
             }
             _ => Err(RuntimeError {
                 message: "list.get() takes one integer argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -32,6 +38,7 @@ pub fn list_method(
         "contains" => {
             let target = args.first().ok_or(RuntimeError {
                 message: "list.contains() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -44,6 +51,7 @@ pub fn list_method(
             }
             _ => Err(RuntimeError {
                 message: "list.where() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -51,6 +59,7 @@ pub fn list_method(
         "add" => {
             let val = args.first().ok_or(RuntimeError {
                 message: "list.add() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -64,6 +73,7 @@ pub fn list_method(
                 if idx >= items.len() {
                     return Err(RuntimeError {
                         message: format!("list index {} out of bounds (len {})", i, items.len()),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -74,6 +84,7 @@ pub fn list_method(
             }
             _ => Err(RuntimeError {
                 message: "list.remove() takes one integer index argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -99,6 +110,7 @@ pub fn list_method(
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError {
                 message: "list.first() called on empty list".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -107,6 +119,7 @@ pub fn list_method(
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError {
                 message: "list.last() called on empty list".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -119,6 +132,7 @@ pub fn list_method(
                 _ => {
                     return Err(RuntimeError {
                         message: "list.merge() takes a string separator argument".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -139,6 +153,7 @@ pub fn list_method(
         }
         _ => Err(RuntimeError {
             message: format!("list has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -158,6 +173,7 @@ pub fn table_method(
         "has" => {
             let key = args.first().ok_or(RuntimeError {
                 message: "table.has() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -166,6 +182,7 @@ pub fn table_method(
         "get" => {
             let key = args.first().ok_or(RuntimeError {
                 message: "table.get() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -173,6 +190,7 @@ pub fn table_method(
                 Some((_, v)) => Ok(v.clone()),
                 None => Err(RuntimeError {
                     message: "table key not found".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -182,6 +200,7 @@ pub fn table_method(
             if args.len() != 2 {
                 return Err(RuntimeError {
                     message: "table.set() takes two arguments (key, value)".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -199,6 +218,7 @@ pub fn table_method(
         "remove" => {
             let key = args.first().ok_or(RuntimeError {
                 message: "table.remove() takes one argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -210,6 +230,7 @@ pub fn table_method(
         "values" => Ok(Value::List(pairs.iter().map(|(_, v)| v.clone()).collect())),
         _ => Err(RuntimeError {
             message: format!("table has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),

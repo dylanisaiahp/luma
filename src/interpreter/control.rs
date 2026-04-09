@@ -19,6 +19,7 @@ impl Interpreter {
             _ => {
                 return Err(RuntimeError {
                     message: "for loop range must be integers".to_string(),
+                    file_path: String::new(),
                     line: start.line,
                     column: start.column,
                 });
@@ -68,6 +69,7 @@ impl Interpreter {
             _ => {
                 return Err(RuntimeError {
                     message: format!("for..in expects a list, got {}", list_val.type_name()),
+                    file_path: String::new(),
                     line: iterable.line,
                     column: iterable.column,
                 });
@@ -118,6 +120,7 @@ impl Interpreter {
             _ => {
                 return Err(RuntimeError {
                     message: format!("for..in expects a table, got {}", table_val.type_name()),
+                    file_path: String::new(),
                     line: iterable.line,
                     column: iterable.column,
                 });
@@ -167,6 +170,7 @@ impl Interpreter {
             None => {
                 return Err(RuntimeError {
                     message: format!("Unknown function: {}", name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -181,6 +185,7 @@ impl Interpreter {
                     func.params.len(),
                     args.len()
                 ),
+                file_path: String::new(),
                 line,
                 column,
             });
@@ -191,7 +196,10 @@ impl Interpreter {
             arg_values.push(self.evaluate_expression(arg)?);
         }
 
+        self.call_depth += 1;
         let saved_return_slot = self.return_slot.take();
+        let saved_file = self.current_file.clone();
+        self.current_file = func.source_file.clone();
 
         self.push_scope();
 
@@ -208,12 +216,13 @@ impl Interpreter {
                     return_value = if encoded == "__return_slot__" {
                         self.return_slot.take().unwrap_or(Value::Void)
                     } else {
-                        Interpreter::decode_return_value(encoded)
+                        Interpreter::decode_return_value(encoded, self.return_slot.take())
                     };
                     break;
                 }
                 Err(e) => {
                     self.pop_scope();
+                    self.current_file = saved_file;
                     self.return_slot = saved_return_slot;
                     return Err(e);
                 }
@@ -221,10 +230,13 @@ impl Interpreter {
         }
 
         self.pop_scope();
+        self.current_file = saved_file;
 
         if self.return_slot.is_none() {
             self.return_slot = saved_return_slot;
         }
+
+        self.call_depth -= 1;
 
         if func.return_type == "void" && return_value != Value::Void {
             return Err(RuntimeError {
@@ -232,17 +244,11 @@ impl Interpreter {
                     "void function '{}' must not return a value — did you mean to declare a return type?",
                     name
                 ),
+                file_path: String::new(),
                 line,
                 column,
             });
         }
-
-        let args_str = args
-            .iter()
-            .map(|_| "…".to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        self.debug.log_call(name, &args_str, &return_value);
 
         Ok(return_value)
     }
@@ -256,7 +262,6 @@ impl Interpreter {
             let cond_val = self.evaluate_expression(condition)?;
             match cond_val {
                 Value::Boolean(true) => {
-                    self.push_scope();
                     let mut should_break = false;
                     let mut return_err = None;
                     for stmt in body {
@@ -272,7 +277,6 @@ impl Interpreter {
                             }
                         }
                     }
-                    self.pop_scope();
                     if let Some(e) = return_err {
                         return Err(e);
                     }
@@ -284,6 +288,7 @@ impl Interpreter {
                 _ => {
                     return Err(RuntimeError {
                         message: format!("While condition must be a boolean, got {:?}", cond_val),
+                        file_path: String::new(),
                         line: condition.line,
                         column: condition.column,
                     });
@@ -337,6 +342,7 @@ impl Interpreter {
             }
             _ => Err(RuntimeError {
                 message: format!("If condition must be a boolean, got {:?}", cond_val),
+                file_path: String::new(),
                 line: condition.line,
                 column: condition.column,
             }),
@@ -362,10 +368,20 @@ impl Interpreter {
                 for arm in arms {
                     if self.pattern_matches(&arm.pattern, item) {
                         self.push_scope();
+                        let mut run_err = None;
                         for stmt in &arm.body {
-                            self.execute_statement(stmt)?;
+                            match self.execute_statement(stmt) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    run_err = Some(e);
+                                    break;
+                                }
+                            }
                         }
                         self.pop_scope();
+                        if let Some(e) = run_err {
+                            return Err(e);
+                        }
                         item_matched = true;
                         any_matched = true;
                     }
@@ -378,10 +394,20 @@ impl Interpreter {
             // else arm fires once if nothing matched at all
             if !any_matched && let Some(else_body) = else_arm {
                 self.push_scope();
+                let mut run_err = None;
                 for stmt in else_body {
-                    self.execute_statement(stmt)?;
+                    match self.execute_statement(stmt) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            run_err = Some(e);
+                            break;
+                        }
+                    }
                 }
                 self.pop_scope();
+                if let Some(e) = run_err {
+                    return Err(e);
+                }
             }
 
             if !unmatched.is_empty() {
@@ -404,10 +430,20 @@ impl Interpreter {
         for arm in arms {
             if self.pattern_matches(&arm.pattern, &match_val) {
                 self.push_scope();
+                let mut run_err = None;
                 for stmt in &arm.body {
-                    self.execute_statement(stmt)?;
+                    match self.execute_statement(stmt) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            run_err = Some(e);
+                            break;
+                        }
+                    }
                 }
                 self.pop_scope();
+                if let Some(e) = run_err {
+                    return Err(e);
+                }
                 matched = true;
                 break;
             }
@@ -415,10 +451,20 @@ impl Interpreter {
 
         if !matched && let Some(else_body) = else_arm {
             self.push_scope();
+            let mut run_err = None;
             for stmt in else_body {
-                self.execute_statement(stmt)?;
+                match self.execute_statement(stmt) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        run_err = Some(e);
+                        break;
+                    }
+                }
             }
             self.pop_scope();
+            if let Some(e) = run_err {
+                return Err(e);
+            }
         }
 
         Ok(Value::Void)
@@ -430,8 +476,13 @@ impl Interpreter {
             MatchPattern::Range(start, end) => {
                 matches!(value, Value::Integer(m) if m >= start && m <= end)
             }
-            MatchPattern::String(s) => matches!(value, Value::String(m) if m == s),
+            MatchPattern::String(s) => {
+                matches!(value, Value::String(m) if m == s)
+            }
             MatchPattern::Set(patterns) => patterns.iter().any(|p| self.pattern_matches(p, value)),
+            MatchPattern::EnumVariant(enum_name, variant) => {
+                matches!(value, Value::EnumVariant { enum_name: en, variant: v } if en == enum_name && v == variant)
+            }
         }
     }
 }

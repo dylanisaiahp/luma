@@ -10,6 +10,7 @@ pub fn eval_read(
     if !args.is_empty() {
         return Err(RuntimeError {
             message: "read() takes no arguments".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -17,6 +18,7 @@ pub fn eval_read(
 
     io::stdout().flush().map_err(|e| RuntimeError {
         message: format!("Failed to flush stdout: {}", e),
+        file_path: String::new(),
         line,
         column,
     })?;
@@ -26,6 +28,7 @@ pub fn eval_read(
         .read_line(&mut input)
         .map_err(|e| RuntimeError {
             message: format!("Failed to read input: {}", e),
+            file_path: String::new(),
             line,
             column,
         })?;
@@ -42,6 +45,7 @@ pub fn eval_write(
     if args.len() != 1 {
         return Err(RuntimeError {
             message: "write() takes exactly one argument".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -51,6 +55,7 @@ pub fn eval_write(
     print!("{}", s);
     io::stdout().flush().map_err(|e| RuntimeError {
         message: format!("Failed to flush stdout: {}", e),
+        file_path: String::new(),
         line,
         column,
     })?;
@@ -74,6 +79,7 @@ pub fn eval_input(
             _ => {
                 return Err(RuntimeError {
                     message: "input() index must be a non-negative integer".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -87,6 +93,7 @@ pub fn eval_input(
 
     Err(RuntimeError {
         message: "input() takes 0 or 1 arguments".to_string(),
+        file_path: String::new(),
         line,
         column,
     })
@@ -101,6 +108,7 @@ pub fn eval_fetch(
     if args.len() != 1 {
         return Err(RuntimeError {
             message: "fetch() takes exactly one argument (url)".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -111,6 +119,7 @@ pub fn eval_fetch(
         Value::String(url) => Ok(Value::FetchHandle(url)),
         _ => Err(RuntimeError {
             message: "fetch() argument must be a string URL".to_string(),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -126,6 +135,7 @@ pub fn eval_file(
     if args.len() != 1 {
         return Err(RuntimeError {
             message: "file() takes exactly one argument (path)".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -135,6 +145,7 @@ pub fn eval_file(
         Value::String(path) => Ok(Value::FileHandle(path)),
         _ => Err(RuntimeError {
             message: "file() argument must be a string path".to_string(),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -152,6 +163,7 @@ pub fn eval_run(
     if args.is_empty() {
         return Err(RuntimeError {
             message: "run() requires at least one argument".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -175,6 +187,7 @@ pub fn eval_run(
         None => {
             return Err(RuntimeError {
                 message: "run() command cannot be empty".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             });
@@ -192,6 +205,7 @@ pub fn eval_run(
                 let msg = if stderr.is_empty() { stdout } else { stderr };
                 Err(RuntimeError {
                     message: format!("__raise__{}", msg),
+                    file_path: String::new(),
                     line,
                     column,
                 })
@@ -199,6 +213,7 @@ pub fn eval_run(
         }
         Err(e) => Err(RuntimeError {
             message: format!("__raise__run(\"{}\") failed: {}", cmd, e),
+            file_path: String::new(),
             line,
             column,
         }),

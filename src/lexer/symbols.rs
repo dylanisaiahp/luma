@@ -155,7 +155,12 @@ impl Lexer {
             }
             ':' => {
                 self.read_char();
-                Ok(TokenKind::Colon)
+                if self.ch == ':' {
+                    self.read_char();
+                    Ok(TokenKind::ColonColon)
+                } else {
+                    Ok(TokenKind::Colon)
+                }
             }
             '%' => {
                 self.read_char();

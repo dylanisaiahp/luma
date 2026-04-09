@@ -148,6 +148,25 @@ impl Parser {
                             column: col,
                         })
                     }
+                    TokenKind::Some => {
+                        self.advance();
+                        self.expect_token(TokenKind::LParen)?;
+                        let inner = self.parse_expression()?;
+                        self.expect_token(TokenKind::RParen)?;
+                        Ok(Expr {
+                            kind: ExprKind::Some(Box::new(inner)),
+                            line,
+                            column: col,
+                        })
+                    }
+                    TokenKind::None => {
+                        self.advance();
+                        Ok(Expr {
+                            kind: ExprKind::None,
+                            line,
+                            column: col,
+                        })
+                    }
                     TokenKind::Read
                     | TokenKind::Int
                     | TokenKind::Float
@@ -159,7 +178,7 @@ impl Parser {
                             TokenKind::Float => "float".to_string(),
                             TokenKind::String => "string".to_string(),
                             TokenKind::Char => "char".to_string(),
-                            _ => unreachable!(),
+                            _ => panic!("type keyword expected"),
                         };
                         self.advance();
 
@@ -173,7 +192,7 @@ impl Parser {
                             self.advance(); // consume '.'
                             let ident = match &self.tokens[self.position].kind {
                                 TokenKind::Identifier(s) => s.clone(),
-                                _ => unreachable!(),
+                                _ => panic!("type constant identifier expected"),
                             };
                             self.advance(); // consume 'max'/'min'
                             return Ok(Expr {

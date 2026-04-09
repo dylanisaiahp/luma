@@ -18,6 +18,7 @@ pub fn evaluate_binary_op(
             if r == 0 {
                 return Err(RuntimeError {
                     message: "Division by zero".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -28,6 +29,7 @@ pub fn evaluate_binary_op(
             if r == 0 {
                 return Err(RuntimeError {
                     message: "Modulo by zero".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -46,6 +48,7 @@ pub fn evaluate_binary_op(
             if r == 0.0 {
                 return Err(RuntimeError {
                     message: "Division by zero".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -64,6 +67,7 @@ pub fn evaluate_binary_op(
             if r == 0.0 {
                 return Err(RuntimeError {
                     message: "Division by zero".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -74,6 +78,7 @@ pub fn evaluate_binary_op(
             if r == 0 {
                 return Err(RuntimeError {
                     message: "Division by zero".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -147,13 +152,72 @@ pub fn evaluate_binary_op(
         // String comparisons
         (Value::String(l), Value::String(r), BinaryOp::Equal) => Ok(Value::Boolean(l == r)),
         (Value::String(l), Value::String(r), BinaryOp::NotEqual) => Ok(Value::Boolean(l != r)),
+        (Value::String(l), Value::String(r), BinaryOp::Greater) => Ok(Value::Boolean(l > r)),
+        (Value::String(l), Value::String(r), BinaryOp::Less) => Ok(Value::Boolean(l < r)),
+        (Value::String(l), Value::String(r), BinaryOp::GreaterEqual) => Ok(Value::Boolean(l >= r)),
+        (Value::String(l), Value::String(r), BinaryOp::LessEqual) => Ok(Value::Boolean(l <= r)),
 
         // Logical operators
         (Value::Boolean(l), Value::Boolean(r), BinaryOp::And) => Ok(Value::Boolean(l && r)),
         (Value::Boolean(l), Value::Boolean(r), BinaryOp::Or) => Ok(Value::Boolean(l || r)),
 
+        // Enum comparisons
+        (
+            Value::EnumVariant {
+                enum_name: l_name,
+                variant: l_var,
+            },
+            Value::EnumVariant {
+                enum_name: r_name,
+                variant: r_var,
+            },
+            BinaryOp::Equal,
+        ) => Ok(Value::Boolean(l_name == r_name && l_var == r_var)),
+        (
+            Value::EnumVariant {
+                enum_name: l_name,
+                variant: l_var,
+            },
+            Value::EnumVariant {
+                enum_name: r_name,
+                variant: r_var,
+            },
+            BinaryOp::NotEqual,
+        ) => Ok(Value::Boolean(l_name != r_name || l_var != r_var)),
+        (
+            Value::EnumVariantData {
+                enum_name: l_name,
+                variant: l_var,
+                data: l_data,
+            },
+            Value::EnumVariantData {
+                enum_name: r_name,
+                variant: r_var,
+                data: r_data,
+            },
+            BinaryOp::Equal,
+        ) => Ok(Value::Boolean(
+            l_name == r_name && l_var == r_var && l_data == r_data,
+        )),
+        (
+            Value::EnumVariantData {
+                enum_name: l_name,
+                variant: l_var,
+                data: l_data,
+            },
+            Value::EnumVariantData {
+                enum_name: r_name,
+                variant: r_var,
+                data: r_data,
+            },
+            BinaryOp::NotEqual,
+        ) => Ok(Value::Boolean(
+            l_name != r_name || l_var != r_var || l_data != r_data,
+        )),
+
         _ => Err(RuntimeError {
             message: "Type mismatch in binary operation".to_string(),
+            file_path: String::new(),
             line,
             column,
         }),

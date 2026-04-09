@@ -95,6 +95,35 @@ impl Lexer {
                             self.read_char(); // consume '"'
                             self.read_char(); // move past it
                         }
+                        'u' => {
+                            self.read_char(); // consume 'u'
+                            let mut hex_str = String::with_capacity(4);
+                            for _ in 0..4 {
+                                let h = self.peek_char();
+                                if h.is_ascii_hexdigit() {
+                                    hex_str.push(h);
+                                    self.read_char();
+                                } else {
+                                    current_string.push_str("\\u");
+                                    current_string.push_str(&hex_str);
+                                    break;
+                                }
+                            }
+                            if hex_str.len() == 4 {
+                                if let Ok(code_point) = u32::from_str_radix(&hex_str, 16) {
+                                    if let Some(c) = char::from_u32(code_point) {
+                                        current_string.push(c);
+                                    } else {
+                                        current_string.push_str("\\u");
+                                        current_string.push_str(&hex_str);
+                                    }
+                                } else {
+                                    current_string.push_str("\\u");
+                                    current_string.push_str(&hex_str);
+                                }
+                            }
+                            self.read_char(); // move past
+                        }
                         _ => {
                             current_string.push('\\');
                             self.read_char();
@@ -159,6 +188,35 @@ impl Lexer {
                     '\'' => {
                         content.push('\'');
                         self.read_char();
+                        self.read_char();
+                    }
+                    'u' => {
+                        self.read_char();
+                        let mut hex_str = String::with_capacity(4);
+                        for _ in 0..4 {
+                            let h = self.peek_char();
+                            if h.is_ascii_hexdigit() {
+                                hex_str.push(h);
+                                self.read_char();
+                            } else {
+                                content.push_str("\\u");
+                                content.push_str(&hex_str);
+                                break;
+                            }
+                        }
+                        if hex_str.len() == 4 {
+                            if let Ok(code_point) = u32::from_str_radix(&hex_str, 16) {
+                                if let Some(c) = char::from_u32(code_point) {
+                                    content.push(c);
+                                } else {
+                                    content.push_str("\\u");
+                                    content.push_str(&hex_str);
+                                }
+                            } else {
+                                content.push_str("\\u");
+                                content.push_str(&hex_str);
+                            }
+                        }
                         self.read_char();
                     }
                     _ => {

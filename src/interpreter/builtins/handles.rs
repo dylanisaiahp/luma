@@ -16,6 +16,7 @@ pub fn fetch_method(
                     .read_to_string()
                     .map_err(|e| RuntimeError {
                         message: format!("fetch().get() failed to read response: {}", e),
+                        file_path: String::new(),
                         line,
                         column,
                     })?;
@@ -23,6 +24,7 @@ pub fn fetch_method(
             }
             Err(e) => Err(RuntimeError {
                 message: format!("fetch().get() request failed: {}", e),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -36,6 +38,7 @@ pub fn fetch_method(
                             "fetch().send() body must be a string, got {}",
                             v.type_name()
                         ),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -53,6 +56,7 @@ pub fn fetch_method(
                             .read_to_string()
                             .map_err(|e| RuntimeError {
                                 message: format!("fetch().send() failed to read response: {}", e),
+                                file_path: String::new(),
                                 line,
                                 column,
                             })?;
@@ -60,6 +64,7 @@ pub fn fetch_method(
                 }
                 Err(e) => Err(RuntimeError {
                     message: format!("fetch().send() request failed: {}", e),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -67,6 +72,7 @@ pub fn fetch_method(
         }
         _ => Err(RuntimeError {
             message: format!("fetch() has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -140,6 +146,7 @@ pub fn input_method(
         }
         _ => Err(RuntimeError {
             message: format!("input() has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -158,6 +165,7 @@ pub fn file_method(
             Ok(contents) => Ok(Value::String(contents)),
             Err(e) => Err(RuntimeError {
                 message: format!("file(\"{}\").read() failed: {}", path, e),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -177,6 +185,7 @@ pub fn file_method(
                 Ok(_) => Ok(Value::Void),
                 Err(e) => Err(RuntimeError {
                     message: format!("file(\"{}\").write() failed: {}", path, e),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -203,12 +212,14 @@ pub fn file_method(
                     Ok(_) => Ok(Value::Void),
                     Err(e) => Err(RuntimeError {
                         message: format!("file(\"{}\").append() failed: {}", path, e),
+                        file_path: String::new(),
                         line,
                         column,
                     }),
                 },
                 Err(e) => Err(RuntimeError {
                     message: format!("file(\"{}\").append() failed to open: {}", path, e),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -222,6 +233,7 @@ pub fn file_method(
                 _ => {
                     return Err(RuntimeError {
                         message: "file.list() takes an optional string filter".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     });
@@ -230,6 +242,7 @@ pub fn file_method(
             let dir_path = std::path::Path::new(path);
             let entries = std::fs::read_dir(dir_path).map_err(|e| RuntimeError {
                 message: format!("file(\"{}\").list() failed: {}", path, e),
+                file_path: String::new(),
                 line,
                 column,
             })?;
@@ -261,6 +274,7 @@ pub fn file_method(
                                         "file(\"{}\").list() failed on subdir: {}",
                                         path, e
                                     ),
+                                    file_path: String::new(),
                                     line,
                                     column,
                                 })?;
@@ -286,6 +300,7 @@ pub fn file_method(
         }
         _ => Err(RuntimeError {
             message: format!("file() has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),

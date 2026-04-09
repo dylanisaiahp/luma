@@ -11,7 +11,7 @@ fn suggest_from_token(token: &TokenKind) -> Option<String> {
             "fn" | "def" | "func" | "function" | "fun" =>
                 Some("Luma defines functions with the return type first:\n           int add(int x, int y) { return x + y; }\n           void greet(string name) { print(name); }".to_string()),
             "null" | "nil" | "undefined" | "none" | "None" | "NULL" =>
-                Some("Luma uses 'empty' for absent values and 'maybe(T)' for optional types.".to_string()),
+                Some("Luma uses 'empty' for absent values and 'option(T)' for optional types.".to_string()),
             "elif" =>
                 Some("Luma uses 'else if' instead of 'elif'.".to_string()),
             "import" | "include" | "require" =>

@@ -18,16 +18,35 @@ impl Interpreter {
             None => {
                 return Err(RuntimeError {
                     message: format!("Unknown struct '{}'", name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
             }
         };
 
-        // Evaluate all provided field values
+        // Evaluate all provided field values, coercing `empty` to the correct
+        // collection type so struct fields typed as list(T) or table(K, V)
+        // don't end up holding Value::Option(None).
         let mut fields: HashMap<String, Value> = HashMap::new();
         for (fname, fexpr) in field_exprs {
             let val = self.evaluate_expression(fexpr)?;
+            let val = match &val {
+                Value::Option(None) => {
+                    if let Some(field_def) = def.fields.iter().find(|f| &f.name == fname) {
+                        if field_def.type_name.starts_with("list") {
+                            Value::List(vec![])
+                        } else if field_def.type_name.starts_with("table") {
+                            Value::Table(vec![])
+                        } else {
+                            val
+                        }
+                    } else {
+                        val
+                    }
+                }
+                other => other.clone(),
+            };
             fields.insert(fname.clone(), val);
         }
 
@@ -36,6 +55,7 @@ impl Interpreter {
             if !fields.contains_key(&sf.name) {
                 return Err(RuntimeError {
                     message: format!("Missing field '{}' in '{}' instantiation", sf.name, name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -47,6 +67,7 @@ impl Interpreter {
             if !declared {
                 return Err(RuntimeError {
                     message: format!("Unknown field '{}' in struct '{}'", fname, name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -72,12 +93,14 @@ impl Interpreter {
             Value::Struct { ref fields, .. } => {
                 fields.get(field).cloned().ok_or_else(|| RuntimeError {
                     message: format!("Struct has no field '{}'", field),
+                    file_path: String::new(),
                     line,
                     column,
                 })
             }
             _ => Err(RuntimeError {
                 message: format!("Cannot access field '{}' on non-struct value", field),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -103,6 +126,7 @@ impl Interpreter {
             _ => {
                 return Err(RuntimeError {
                     message: format!("Cannot call method '{}' on non-struct value", method),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -114,6 +138,7 @@ impl Interpreter {
             None => {
                 return Err(RuntimeError {
                     message: format!("Unknown struct '{}'", struct_name),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -125,6 +150,7 @@ impl Interpreter {
             None => {
                 return Err(RuntimeError {
                     message: format!("Struct '{}' has no method '{}'", struct_name, method),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -146,6 +172,7 @@ impl Interpreter {
                     method_def.params.len(),
                     arg_values.len()
                 ),
+                file_path: String::new(),
                 line,
                 column,
             });
@@ -169,7 +196,11 @@ impl Interpreter {
                 Ok(_) => {}
                 Err(e) if e.message.starts_with("__return__") => {
                     let encoded = e.message.strip_prefix("__return__").unwrap_or("");
-                    return_value = Interpreter::decode_return_value(encoded);
+                    return_value = if encoded == "__return_slot__" {
+                        self.return_slot.take().unwrap_or(Value::Void)
+                    } else {
+                        Interpreter::decode_return_value(encoded, self.return_slot.take())
+                    };
                     break;
                 }
                 Err(e) => {

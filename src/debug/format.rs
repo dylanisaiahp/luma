@@ -13,11 +13,16 @@ pub fn interpreter_tag() -> String {
     "[interpreter]".magenta().to_string()
 }
 
-pub fn level_tag(verbose: bool) -> String {
-    if verbose {
+pub fn level_tag(verbose: bool, filename: Option<&str>) -> String {
+    let base = if verbose {
         "[verbose]".dimmed().to_string()
     } else {
         "[basic]".dimmed().to_string()
+    };
+    if let Some(name) = filename {
+        format!("{} {}", base, name)
+    } else {
+        base
     }
 }
 

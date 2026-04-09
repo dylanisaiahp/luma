@@ -19,16 +19,19 @@ impl Parser {
             }
             Some(TokenKind::For) => self.parse_for_statement(),
             Some(TokenKind::Struct) => self.parse_struct_declaration(),
+            Some(TokenKind::Enum) => self.parse_enum_declaration(),
+            // mutable/const prefix — route to variable declaration
+            Some(TokenKind::Mutable) | Some(TokenKind::Const) => self.parse_variable_declaration(),
             Some(TokenKind::Int)
             | Some(TokenKind::Float)
             | Some(TokenKind::Bool)
             | Some(TokenKind::String)
             | Some(TokenKind::Char)
-            | Some(TokenKind::Maybe)
+            | Some(TokenKind::Option)
             | Some(TokenKind::Worry)
             | Some(TokenKind::List)
             | Some(TokenKind::Table) => self.parse_variable_declaration(),
-            // Struct variable declaration: Point p = ...
+            // Struct/enum variable declaration: Point p = ...
             // Detect: Identifier Identifier = pattern
             Some(TokenKind::Identifier(_))
                 if matches!(

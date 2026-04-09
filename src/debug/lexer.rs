@@ -2,9 +2,14 @@
 use crate::debug::format::{self, level_tag, lexer_tag};
 use crate::lexer::{Token, TokenKind};
 
-pub fn print_lexer_debug(tokens: &[Token], errors: &[crate::lexer::LexerError], verbose: bool) {
+pub fn print_lexer_debug(
+    tokens: &[Token],
+    errors: &[crate::lexer::LexerError],
+    verbose: bool,
+    filename: &str,
+) {
     let tag = lexer_tag();
-    let level = level_tag(verbose);
+    let level = level_tag(verbose, Some(filename));
     let line_count = tokens.iter().map(|t| t.line).max().unwrap_or(0);
     let token_count = tokens.iter().filter(|t| t.kind != TokenKind::Eof).count();
 

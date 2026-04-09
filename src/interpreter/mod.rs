@@ -18,6 +18,7 @@ use crate::error::diagnostic::Span;
 pub struct VarInfo {
     pub name: String,
     pub span: Span,
+    pub mutable: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +26,7 @@ pub struct FunctionDef {
     pub return_type: String,
     pub params: Vec<Param>,
     pub body: Vec<Stmt>,
+    pub source_file: String,
 }
 
 #[derive(Debug, Clone)]

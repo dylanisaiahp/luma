@@ -44,9 +44,22 @@ pub enum ExprKind {
         type_name: String,
         constant: String,
     },
+    // Enum variant access: Color.Red
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+    },
+    // Enum variant with data: Result.Ok(value)
+    EnumVariantData {
+        enum_name: String,
+        variant: String,
+        data: Vec<Expr>,
+    },
     List(Vec<Expr>),
     Table(Vec<(Expr, Expr)>),
     Empty,
+    Some(Box<Expr>),
+    None,
     StructInstantiate {
         name: String,
         fields: Vec<(String, Expr)>,
@@ -77,6 +90,7 @@ pub enum MatchPattern {
     Range(i64, i64),
     String(String),
     Set(Vec<MatchPattern>),
+    EnumVariant(String, String), // enum_name, variant
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,7 +114,14 @@ pub struct StructMethod {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
+    pub data_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
+    #[allow(dead_code)]
     Program(Vec<Stmt>),
     Function {
         return_type: String,
@@ -113,6 +134,12 @@ pub enum Stmt {
         fields: Vec<StructField>,
         methods: Vec<StructMethod>,
     },
+    // enum Color { Red, Green, Blue }
+    // enum Result { Ok(int), Err(string) }
+    EnumDeclaration {
+        name: String,
+        variants: Vec<EnumVariant>,
+    },
     ModuleDeclaration {
         name: String,
     },
@@ -120,6 +147,7 @@ pub enum Stmt {
         type_name: String,
         name: String,
         value: Expr,
+        mutable: bool,
         else_error: Option<(String, Vec<Stmt>)>,
     },
     Print(Expr),

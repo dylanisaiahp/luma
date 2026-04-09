@@ -131,8 +131,8 @@ impl Parser {
             }
             last_position = self.position;
 
-            // maybe(type) function_name() — tokens: maybe ( type ) ident (
-            let is_maybe_function = if token.kind == TokenKind::Maybe {
+            // option(type) function_name() — tokens: option ( type ) ident (
+            let is_option_function = if token.kind == TokenKind::Option {
                 matches!(self.tokens.get(self.position + 1), Some(t) if t.kind == TokenKind::LParen)
                     && matches!(self.tokens.get(self.position + 3), Some(t) if t.kind == TokenKind::RParen)
                     && matches!(self.tokens.get(self.position + 4), Some(t) if matches!(t.kind, TokenKind::Identifier(_)))
@@ -187,7 +187,9 @@ impl Parser {
                         Some(TokenKind::Float) => "float".to_string(),
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
-                        _ => unreachable!(),
+                        Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(_)) => "unknown".to_string(),
+                        _ => "void".to_string(),
                     };
                     self.advance();
                     if let Some(func) = self.parse_function(return_type) {
@@ -200,8 +202,8 @@ impl Parser {
                         statements.push(func);
                     }
                 }
-                TokenKind::Maybe if is_maybe_function => {
-                    self.advance(); // consume 'maybe'
+                TokenKind::Option if is_option_function => {
+                    self.advance(); // consume 'option'
                     if let Err(e) = self.expect_token(TokenKind::LParen) {
                         self.errors.push(e);
                         continue;
@@ -212,10 +214,11 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(name)) => name.clone(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
-                                expected: "type inside maybe()".to_string(),
+                                expected: "type inside option()".to_string(),
                                 got: token.kind,
                                 line_num: token.line,
                                 col_num: token.column,
@@ -228,7 +231,7 @@ impl Parser {
                         self.errors.push(e);
                         continue;
                     }
-                    let return_type = format!("maybe({})", inner);
+                    let return_type = format!("option({})", inner);
                     if let Some(func) = self.parse_function(return_type) {
                         statements.push(func);
                     }
@@ -245,6 +248,7 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(name)) => name.clone(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -278,6 +282,7 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(name)) => name.clone(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -311,6 +316,7 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(name)) => name.clone(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -333,6 +339,7 @@ impl Parser {
                         Some(TokenKind::Bool) => "bool".to_string(),
                         Some(TokenKind::String) => "string".to_string(),
                         Some(TokenKind::Char) => "char".to_string(),
+                        Some(TokenKind::Identifier(name)) => name.clone(),
                         _ => {
                             let token = self.current_or_eof();
                             self.errors.push(ParseError::UnexpectedToken {
@@ -454,6 +461,16 @@ impl Parser {
                     statements.push(Stmt::ModuleDeclaration { name });
                 }
                 TokenKind::Eof => break,
+                TokenKind::Identifier(_) if self.is_typed_function() => {
+                    let return_type = match &token.kind {
+                        TokenKind::Identifier(name) => name.clone(),
+                        _ => panic!("typed function requires identifier for return type"),
+                    };
+                    self.advance();
+                    if let Some(func) = self.parse_function(return_type) {
+                        statements.push(func);
+                    }
+                }
                 _ => {
                     if let Some(stmt) = self.parse_statement() {
                         statements.push(stmt);

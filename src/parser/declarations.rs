@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use crate::parser::error::ParseError;
 
 impl Parser {
-    // Helper: parse a simple inner type (int/float/bool/string/char)
+    // Helper: parse a simple inner type (int/float/bool/string/char or custom type)
     fn parse_inner_type(&mut self) -> Option<String> {
         match self.current_token().map(|t| t.kind.clone()) {
             Some(TokenKind::Int) => {
@@ -28,10 +28,15 @@ impl Parser {
                 self.advance();
                 Some("char".to_string())
             }
+            Some(TokenKind::Identifier(name)) => {
+                self.advance();
+                Some(name)
+            }
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "inner type (int/float/bool/string/char)".to_string(),
+                    expected: "inner type (int/float/bool/string/char or struct/enum name)"
+                        .to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -64,7 +69,7 @@ impl Parser {
                 self.advance();
                 Some("char".to_string())
             }
-            Some(TokenKind::Maybe) => {
+            Some(TokenKind::Option) => {
                 self.advance();
                 if let Err(e) = self.expect_token(TokenKind::LParen) {
                     self.errors.push(e);
@@ -75,7 +80,7 @@ impl Parser {
                     self.errors.push(e);
                     return None;
                 }
-                Some(format!("maybe({})", inner))
+                Some(format!("option({})", inner))
             }
             Some(TokenKind::Worry) => {
                 self.advance();
@@ -121,7 +126,7 @@ impl Parser {
                 }
                 Some(format!("table({}, {})", key_type, val_type))
             }
-            // Struct type — identifier used as type name (e.g. Point, Person)
+            // Struct or enum type — identifier used as type name
             // Only consume if followed by another identifier (the variable name)
             Some(TokenKind::Identifier(name)) => {
                 if matches!(
@@ -135,7 +140,7 @@ impl Parser {
                     let token = self.current_or_eof();
                     self.errors.push(ParseError::UnexpectedToken {
                         expected:
-                            "type (int/float/bool/string/char/maybe/list/table or struct name)"
+                            "type (int/float/bool/string/char/option/list/table or struct/enum name)"
                                 .to_string(),
                         got: token.kind,
                         line_num: token.line,
@@ -147,7 +152,7 @@ impl Parser {
             _ => {
                 let token = self.current_or_eof();
                 self.errors.push(ParseError::UnexpectedToken {
-                    expected: "type (int/float/bool/string/char/maybe/list/table)".to_string(),
+                    expected: "type (int/float/bool/string/char/option/list/table)".to_string(),
                     got: token.kind,
                     line_num: token.line,
                     col_num: token.column,
@@ -158,7 +163,6 @@ impl Parser {
     }
 
     /// Peek ahead to decide if the RHS is a table literal `("key": value, ...)`.
-    /// A table literal must have a `:` at depth 1 inside the parens.
     pub fn looks_like_table_literal(&self) -> bool {
         if !matches!(
             self.tokens.get(self.position).map(|t| &t.kind),
@@ -266,8 +270,109 @@ impl Parser {
         })
     }
 
+    /// Parse an enum declaration: enum Color { Red, Green, Blue }
+    /// or with data: enum Result { Ok(int), Err(string) }
+    pub fn parse_enum_declaration(&mut self) -> Option<Stmt> {
+        // consume 'enum'
+        self.advance();
+
+        let name = match self.current_token().cloned() {
+            Some(t) => match t.kind {
+                TokenKind::Identifier(n) => {
+                    self.advance();
+                    n
+                }
+                _ => {
+                    self.errors.push(ParseError::UnexpectedToken {
+                        expected: "enum name".to_string(),
+                        got: t.kind,
+                        line_num: t.line,
+                        col_num: t.column,
+                    });
+                    return None;
+                }
+            },
+            None => {
+                self.errors.push(ParseError::UnexpectedEOF);
+                return None;
+            }
+        };
+
+        if let Err(e) = self.expect_token(TokenKind::LBrace) {
+            self.errors.push(e);
+            return None;
+        }
+
+        let mut variants = Vec::new();
+
+        loop {
+            match self.current_token().cloned() {
+                Some(t) if t.kind == TokenKind::RBrace => {
+                    self.advance();
+                    break;
+                }
+                Some(t) => match t.kind {
+                    TokenKind::Identifier(variant_name) => {
+                        self.advance();
+
+                        let data_type =
+                            if self.current_token().map(|t| &t.kind) == Some(&TokenKind::LParen) {
+                                self.advance();
+                                let inner = self.parse_inner_type()?;
+                                if let Err(e) = self.expect_token(TokenKind::RParen) {
+                                    self.errors.push(e);
+                                    return None;
+                                }
+                                Some(inner)
+                            } else {
+                                None
+                            };
+
+                        variants.push(crate::ast::EnumVariant {
+                            name: variant_name,
+                            data_type,
+                        });
+
+                        if let Some(TokenKind::Comma) = self.current_token().map(|t| &t.kind) {
+                            self.advance();
+                        }
+                    }
+                    _ => {
+                        self.errors.push(ParseError::UnexpectedToken {
+                            expected: "variant name or '}'".to_string(),
+                            got: t.kind,
+                            line_num: t.line,
+                            col_num: t.column,
+                        });
+                        return None;
+                    }
+                },
+                None => {
+                    self.errors.push(ParseError::UnexpectedEOF);
+                    return None;
+                }
+            }
+        }
+
+        Some(Stmt::EnumDeclaration { name, variants })
+    }
+
     pub fn parse_variable_declaration(&mut self) -> Option<Stmt> {
         let start_pos = self.position;
+
+        // Check for mutable or const prefix
+        let mutable = match self.current_token().map(|t| &t.kind) {
+            Some(TokenKind::Mutable) => {
+                self.advance();
+                true
+            }
+            Some(TokenKind::Const) => {
+                // const is immutable — advance past it, mutable = false
+                self.advance();
+                false
+            }
+            _ => false,
+        };
 
         let type_name = self.parse_type_string()?;
 
@@ -296,9 +401,6 @@ impl Parser {
             return None;
         }
 
-        // For table-typed variables, decide if RHS is a table literal or expression.
-        // `empty` is handled by parse_expression which returns ExprKind::Empty.
-        // `()` is no longer valid for empty list/table — use `empty`.
         let value = if type_name.starts_with("table") && self.looks_like_table_literal() {
             match self.parse_table_literal() {
                 Ok(expr) => expr,
@@ -311,7 +413,6 @@ impl Parser {
         } else {
             match self.parse_expression() {
                 Ok(expr) => {
-                    // Guard: `()` is not valid for list/table initialization — use `empty`
                     if (type_name.starts_with("list") || type_name.starts_with("table"))
                         && matches!(expr.kind, ExprKind::List(ref items) if items.is_empty())
                     {
@@ -336,7 +437,7 @@ impl Parser {
 
         // Check for 'else error_var { body }' before semicolon
         let else_error = if let Some(TokenKind::Else) = self.current_token().map(|t| &t.kind) {
-            self.advance(); // consume 'else'
+            self.advance();
             let error_var = match self.current_token().map(|t| &t.kind) {
                 Some(TokenKind::Identifier(name)) => {
                     let name = name.clone();
@@ -381,17 +482,15 @@ impl Parser {
             type_name,
             name,
             value,
+            mutable,
             else_error,
         })
     }
 
-    // Parse table literal: ("key": value, "key2": value2)
-    // Note: `empty` is handled separately via parse_expression → ExprKind::Empty
     pub fn parse_table_literal(&mut self) -> Result<Expr, ParseError> {
         let line = self.current_or_eof().line;
         let col = self.current_or_eof().column;
 
-        // Handle `empty` keyword
         if let Some(TokenKind::Empty) = self.current_token().map(|t| &t.kind) {
             self.advance();
             return Ok(Expr {

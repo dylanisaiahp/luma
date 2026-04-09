@@ -6,6 +6,7 @@ use crate::error::ErrorCollector;
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Instant;
 
 #[derive(Parser)]
@@ -20,13 +21,13 @@ pub enum Commands {
     /// Create a new Luma project
     New { name: String },
 
-    /// Create a new .lm file or directory
+    /// Create a new .slt file or directory
     Create { path: String },
 
     /// Run a Luma file or project
     #[command(trailing_var_arg = true)]
     Run {
-        /// File to run (optional — reads luma.toml entry if omitted)
+        /// File to run (optional — reads slate.toml entry if omitted)
         file: Option<String>,
         #[arg(long, help = "Show execution time")]
         time: bool,
@@ -46,7 +47,7 @@ pub enum Commands {
 
     /// Compile a Luma file or project to a native binary
     Build {
-        /// File to build (optional — reads luma.toml entry if omitted)
+        /// File to build (optional — reads slate.toml entry if omitted)
         file: Option<String>,
         /// Output binary name (default: program)
         #[arg(long, default_value = "program")]
@@ -107,6 +108,127 @@ fn parse_toml_string(line: &str, key: &str) -> Option<String> {
     Some(rest.to_string())
 }
 
+#[derive(Debug)]
+struct GitDep {
+    name: String,
+    url: String,
+}
+
+fn parse_deps(content: &str) -> Vec<GitDep> {
+    let mut deps = Vec::new();
+    let mut in_deps_section = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed == "[deps]" {
+            in_deps_section = true;
+            continue;
+        }
+
+        if trimmed.starts_with('[') {
+            in_deps_section = false;
+            continue;
+        }
+
+        if in_deps_section
+            && trimmed.contains('{')
+            && trimmed.contains("git")
+            && let Some(eq_pos) = trimmed.find('=')
+        {
+            let name = trimmed[..eq_pos].trim().to_string();
+            let inline = trimmed[eq_pos + 1..].trim();
+            if let Some(url) = parse_inline_git(inline) {
+                deps.push(GitDep { name, url });
+            }
+        }
+    }
+
+    deps
+}
+
+fn parse_inline_git(inline: &str) -> Option<String> {
+    let inner = inline.strip_prefix('{')?.strip_suffix('}')?.trim();
+    let prefix = "git =";
+    if !inner.starts_with(prefix) {
+        return None;
+    }
+    let rest = inner[prefix.len()..].trim();
+    let rest = rest.strip_prefix('"')?.strip_suffix('"')?;
+    Some(rest.to_string())
+}
+
+fn dep_cache_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".slate")
+        .join("deps")
+}
+
+fn ensure_deps(toml_path: &Path) -> anyhow::Result<()> {
+    if !toml_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(toml_path)?;
+    let deps = parse_deps(&content);
+
+    if deps.is_empty() {
+        return Ok(());
+    }
+
+    let cache = dep_cache_dir();
+    fs::create_dir_all(&cache)?;
+
+    for dep in &deps {
+        let dep_dir = cache.join(&dep.name);
+
+        if dep_dir.exists() {
+            let status = Command::new("git")
+                .args(["pull"])
+                .current_dir(&dep_dir)
+                .status()?;
+            if !status.success() {
+                eprintln!("[!] git pull failed for '{}'", dep.name);
+            } else {
+                println!("updated dependency '{}'", dep.name);
+            }
+        } else {
+            println!("cloning dependency '{}'...", dep.name);
+            let status = Command::new("git")
+                .args(["clone", &dep.url, dep_dir.to_str().unwrap()])
+                .status()?;
+            if !status.success() {
+                anyhow::bail!("git clone failed for '{}'", dep.name);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn search_dep_cache(module_name: &str) -> Option<PathBuf> {
+    let cache = dep_cache_dir();
+    if !cache.exists() {
+        return None;
+    }
+
+    let entries = fs::read_dir(&cache).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let source_dir = path.join("source");
+            if source_dir.exists()
+                && let Some(found) = find_module_declaration(&source_dir, module_name)
+            {
+                return Some(found);
+            }
+        }
+    }
+
+    None
+}
+
 fn print_step(label: &str) {
     println!("{:<36} done.", label);
 }
@@ -137,17 +259,36 @@ pub fn execute_command(command: Commands) -> anyhow::Result<()> {
                 Some(f) => f,
                 None => resolve_entry_from_toml()?,
             };
-            build_file(&target, &name)
+            let binary_name = if name == "program" {
+                get_project_name_from_toml().unwrap_or_else(|| "program".to_string())
+            } else {
+                name
+            };
+            build_file(&target, &binary_name)
         }
     }
 }
 
+fn get_project_name_from_toml() -> Option<String> {
+    let toml_path = Path::new("slate.toml");
+    if !toml_path.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(toml_path).ok()?;
+    let config = LumaToml::parse(&content);
+    if config.name.is_empty() {
+        None
+    } else {
+        Some(config.name)
+    }
+}
+
 fn resolve_entry_from_toml() -> anyhow::Result<String> {
-    let toml_path = Path::new("luma.toml");
+    let toml_path = Path::new("slate.toml");
     if !toml_path.exists() {
         anyhow::bail!(
-            "No file specified and no luma.toml found.\n\
-             Run 'luma run <file>' or create a luma.toml with an entry point."
+            "No file specified and no slate.toml found.\n\
+             Run 'luma run <file>' or create a slate.toml with an entry point."
         );
     }
 
@@ -169,13 +310,13 @@ fn resolve_entry_from_toml() -> anyhow::Result<String> {
             }
             anyhow::bail!(
                 "Entry point '{}' not found.\n\
-                 Check your luma.toml or run 'luma run <file>' directly.",
+                 Check your slate.toml or run 'luma run <file>' directly.",
                 entry
             )
         }
         None => anyhow::bail!(
-            "luma.toml has no entry point defined.\n\
-             Add 'entry = \"source/main.lm\"' or run 'luma run <file>' directly."
+            "slate.toml has no entry point defined.\n\
+             Add 'entry = \"source/main.slt\"' or run 'luma run <file>' directly."
         ),
     }
 }
@@ -204,6 +345,10 @@ fn resolve_use(module_name: &str, importing_file: &str) -> Option<PathBuf> {
         return Some(path);
     }
 
+    if let Some(path) = search_dep_cache(module_name) {
+        return Some(path);
+    }
+
     if let Some(parent) = Path::new(importing_file).parent()
         && let Some(path) = find_module_declaration(parent, module_name)
     {
@@ -221,7 +366,7 @@ fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
             if let Some(found) = find_module_declaration(&path, module_name) {
                 return Some(found);
             }
-        } else if path.extension().and_then(|e| e.to_str()) == Some("lm")
+        } else if path.extension().and_then(|e| e.to_str()) == Some("slt")
             && let Ok(content) = fs::read_to_string(&path)
             && content
                 .lines()
@@ -231,6 +376,116 @@ fn find_module_declaration(dir: &Path, module_name: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Load a file and all its transitive `use` dependencies, grouped by source file.
+/// Returns (file_path, source_content, statements) for each file, plus per-file collectors.
+fn load_with_uses_grouped(
+    file_path: &str,
+    visited: &mut std::collections::HashSet<String>,
+    collectors: &mut Vec<ErrorCollector>,
+    debug: &DebugConfig,
+) -> Vec<(String, String, Vec<Stmt>)> {
+    let canonical = fs::canonicalize(file_path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| file_path.to_string());
+
+    if visited.contains(&canonical) {
+        return Vec::new();
+    }
+    visited.insert(canonical.clone());
+
+    let source = match fs::read_to_string(file_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[!] Could not read '{}': {}", file_path, e);
+            return Vec::new();
+        }
+    };
+
+    let mut collector = ErrorCollector::new(&source, file_path);
+
+    let mut lexer = crate::lexer::Lexer::new(&source);
+    let (tokens, lex_errors) = lexer.tokenize();
+
+    if debug.lexer {
+        crate::debug::lexer::print_lexer_debug(&tokens, &lex_errors, debug.verbose, file_path);
+    }
+
+    for error in lex_errors {
+        collector.add_lexer_error(error);
+    }
+
+    let mut parser = crate::parser::Parser::new(tokens);
+    let statements = parser.parse_program();
+    let parse_errors = parser.take_errors();
+
+    if debug.parser {
+        crate::debug::parser::print_parser_debug(
+            &statements,
+            parse_errors.len(),
+            debug.verbose,
+            file_path,
+        );
+    }
+
+    for error in parse_errors {
+        collector.add_parse_error(error);
+    }
+
+    let mut file_groups: Vec<(String, String, Vec<Stmt>)> = Vec::new();
+    let mut non_use_stmts: Vec<Stmt> = Vec::new();
+
+    for stmt in &statements {
+        if let Stmt::Use { module, items } = stmt {
+            match resolve_use(module, file_path) {
+                Some(mod_path) => {
+                    let mod_path_str = mod_path.to_string_lossy().to_string();
+                    let mut mod_groups =
+                        load_with_uses_grouped(&mod_path_str, visited, collectors, debug);
+
+                    if let Some(selected) = items {
+                        for (_, _, stmts) in &mut mod_groups {
+                            stmts.retain(|s| match s {
+                                Stmt::Function { name, .. } => selected.contains(name),
+                                Stmt::StructDeclaration { name, .. } => selected.contains(name),
+                                _ => true,
+                            });
+                        }
+                    }
+
+                    for group in mod_groups {
+                        // Strip ModuleDeclaration from dependency files
+                        let filtered: Vec<Stmt> = group
+                            .2
+                            .into_iter()
+                            .filter(|s| !matches!(s, Stmt::ModuleDeclaration { .. }))
+                            .collect();
+                        if !filtered.is_empty() {
+                            file_groups.push((group.0, group.1, filtered));
+                        }
+                    }
+                }
+                None => {
+                    eprintln!(
+                        "[!] Could not resolve module '{}' (imported in '{}')\n    \
+                             Make sure the file contains: module {};",
+                        module, file_path, module
+                    );
+                }
+            }
+        } else if !matches!(stmt, Stmt::ModuleDeclaration { .. }) {
+            non_use_stmts.push(stmt.clone());
+        }
+    }
+
+    // Add this file's own non-use statements as a group
+    if !non_use_stmts.is_empty() {
+        file_groups.push((canonical.clone(), source.clone(), non_use_stmts));
+    }
+
+    collectors.push(collector);
+    file_groups
 }
 
 /// Load a file and all its transitive `use` dependencies.
@@ -266,7 +521,7 @@ fn load_with_uses(
     let (tokens, lex_errors) = lexer.tokenize();
 
     if debug.lexer {
-        crate::debug::lexer::print_lexer_debug(&tokens, &lex_errors, debug.verbose);
+        crate::debug::lexer::print_lexer_debug(&tokens, &lex_errors, debug.verbose, file_path);
     }
 
     for error in lex_errors {
@@ -278,7 +533,12 @@ fn load_with_uses(
     let parse_errors = parser.take_errors();
 
     if debug.parser {
-        crate::debug::parser::print_parser_debug(&statements, parse_errors.len(), debug.verbose);
+        crate::debug::parser::print_parser_debug(
+            &statements,
+            parse_errors.len(),
+            debug.verbose,
+            file_path,
+        );
     }
 
     for error in parse_errors {
@@ -336,16 +596,16 @@ fn create_project(name: &str) -> anyhow::Result<()> {
     print_step(&format!("creating {}/source/", name));
     fs::create_dir(path.join("source"))?;
 
-    print_step(&format!("creating {}/source/main.lm", name));
+    print_step(&format!("creating {}/source/main.slt", name));
     let main_content = "void main() {\n    print(\"Hello, Luma!\");\n}\n";
-    fs::write(path.join("source/main.lm"), main_content)?;
+    fs::write(path.join("source/main.slt"), main_content)?;
 
-    print_step(&format!("creating {}/luma.toml", name));
+    print_step(&format!("creating {}/slate.toml", name));
     let toml_content = format!(
-        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\ndescription = \"\"\nentry = \"source/main.lm\"\n",
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\ndescription = \"\"\nentry = \"source/main.slt\"\n",
         name
     );
-    fs::write(path.join("luma.toml"), toml_content)?;
+    fs::write(path.join("slate.toml"), toml_content)?;
 
     print_step(&format!("creating {}/README.md", name));
     let readme = format!("# {}\n\nA Luma project.\n", name);
@@ -396,8 +656,8 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let stem = raw_path.trim_end_matches(".lm");
-    let file_path = format!("{}.lm", stem);
+    let stem = raw_path.trim_end_matches(".slt");
+    let file_path = format!("{}.slt", stem);
     let path = Path::new(&file_path);
 
     if path.exists() {
@@ -430,12 +690,14 @@ fn create_path(raw_path: &str) -> anyhow::Result<()> {
 }
 
 fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<()> {
+    ensure_deps(Path::new("slate.toml"))?;
+
     let start = Instant::now();
 
     let mut visited = std::collections::HashSet::new();
     let mut collectors: Vec<ErrorCollector> = Vec::new();
 
-    let statements = load_with_uses(file, &mut visited, &mut collectors, &debug);
+    let file_groups = load_with_uses_grouped(file, &mut visited, &mut collectors, &debug);
 
     // Check parse/lex errors across all files before running
     let has_parse_errors = collectors.iter().any(|c| c.has_errors());
@@ -447,17 +709,13 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
         std::process::exit(1);
     }
 
-    let ast = Stmt::Program(statements);
     let mut interpreter = crate::interpreter::Interpreter::new();
     interpreter.debug_mode = debug.interpreter || debug.lexer || debug.parser;
 
-    let entry_source = fs::read_to_string(file).unwrap_or_default();
-    let mut runtime_collector = ErrorCollector::new(&entry_source, file);
-
-    match interpreter.interpret(&ast, &entry_source, file) {
+    match interpreter.interpret_grouped(&file_groups, file) {
         Ok(()) => {
             if debug.interpreter {
-                interpreter.debug.print_debug(debug.verbose);
+                interpreter.debug.print_debug(debug.verbose, file);
             }
             for line in &interpreter.output_buffer {
                 println!("{}", line);
@@ -470,18 +728,35 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
                 if let Some(c) = target {
                     c.add_warning(warning);
                 } else {
-                    runtime_collector.add_warning(warning);
+                    let empty_source = "";
+                    let mut rc = ErrorCollector::new(empty_source, &warning.span.filename);
+                    rc.add_warning(warning);
+                    rc.print_all();
                 }
             }
         }
         Err(e) => {
             if debug.interpreter {
-                interpreter.debug.print_debug(debug.verbose);
+                interpreter.debug.print_debug(debug.verbose, file);
             }
             for line in &interpreter.output_buffer {
                 println!("{}", line);
             }
-            runtime_collector.add_runtime_error(e.message, "".to_string(), e.line, e.column);
+            // Route runtime error to the correct file's collector
+            let error_file = if e.file_path.is_empty() {
+                file.to_string()
+            } else {
+                e.file_path.clone()
+            };
+            let target = collectors.iter_mut().find(|c| c.filename == error_file);
+            if let Some(c) = target {
+                c.add_runtime_error(e.message.clone(), "".to_string(), e.line, e.column);
+            } else {
+                let src = fs::read_to_string(&error_file).unwrap_or_default();
+                let mut rc = ErrorCollector::new(&src, &error_file);
+                rc.add_runtime_error(e.message.clone(), "".to_string(), e.line, e.column);
+                rc.print_all();
+            }
         }
     }
 
@@ -489,11 +764,8 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
     for collector in &collectors {
         collector.print_all();
     }
-    if runtime_collector.has_errors() || !runtime_collector.warnings.is_empty() {
-        runtime_collector.print_all();
-    }
 
-    if runtime_collector.has_errors() {
+    if collectors.iter().any(|c| c.has_errors()) {
         std::process::exit(1);
     }
 
@@ -506,6 +778,8 @@ fn run_file(file: &str, show_time: bool, debug: DebugConfig) -> anyhow::Result<(
 }
 
 fn build_file(file: &str, name: &str) -> anyhow::Result<()> {
+    ensure_deps(Path::new("slate.toml"))?;
+
     let mut visited = std::collections::HashSet::new();
     let mut collectors: Vec<ErrorCollector> = Vec::new();
     let debug = DebugConfig::none();
@@ -531,6 +805,8 @@ fn build_file(file: &str, name: &str) -> anyhow::Result<()> {
 }
 
 fn check_file(file: &str) -> anyhow::Result<()> {
+    ensure_deps(Path::new("slate.toml"))?;
+
     let source = fs::read_to_string(file)?;
     let mut collector = ErrorCollector::new(&source, file);
 
@@ -543,7 +819,8 @@ fn check_file(file: &str) -> anyhow::Result<()> {
 
     let mut parser = crate::parser::Parser::new(tokens);
     let _statements = parser.parse_program();
-    for error in parser.take_errors() {
+    let errors = parser.take_errors();
+    for error in errors {
         collector.add_parse_error(error);
     }
 

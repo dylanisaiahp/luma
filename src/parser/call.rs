@@ -21,7 +21,7 @@ impl Parser {
                     if is_struct_instantiate {
                         let struct_name = match &expr.kind {
                             ExprKind::Identifier(n) => n.clone(),
-                            _ => unreachable!(),
+                            _ => panic!("struct instantiation requires identifier"),
                         };
                         self.advance(); // consume '('
                         let mut fields = Vec::new();
@@ -93,9 +93,20 @@ impl Parser {
                                     column: token.column,
                                 };
                             }
+                            ExprKind::EnumVariant { enum_name, variant } => {
+                                expr = Expr {
+                                    kind: ExprKind::EnumVariantData {
+                                        enum_name,
+                                        variant,
+                                        data: args,
+                                    },
+                                    line: token.line,
+                                    column: token.column,
+                                };
+                            }
                             _ => {
                                 return Err(ParseError::UnexpectedToken {
-                                    expected: "function name".to_string(),
+                                    expected: "function name or enum variant".to_string(),
                                     got: token.kind,
                                     line_num: token.line,
                                     col_num: token.column,
@@ -170,24 +181,75 @@ impl Parser {
                             }
                         }
                         self.expect_token(TokenKind::RParen)?;
-                        expr = Expr {
-                            kind: ExprKind::MethodCall {
-                                object: Box::new(expr),
-                                method: member,
-                                args,
-                            },
-                            line: dot_token.line,
-                            column: dot_token.column,
-                        };
+
+                        // Check if this is an enum variant construction (EnumName.Variant(...))
+                        // TODO: This heuristic uses uppercase-first-char to detect enums, but struct names
+                        // also start with uppercase. Post-self-hosting, replace with proper type-system
+                        // resolution that checks the actual type context.
+                        let is_enum_variant = matches!(&expr.kind, ExprKind::Identifier(_))
+                            && member
+                                .chars()
+                                .next()
+                                .map(|c| c.is_uppercase())
+                                .unwrap_or(false);
+
+                        if is_enum_variant {
+                            let enum_name = match &expr.kind {
+                                ExprKind::Identifier(n) => n.clone(),
+                                _ => panic!("enum variant with data requires identifier"),
+                            };
+                            expr = Expr {
+                                kind: ExprKind::EnumVariantData {
+                                    enum_name,
+                                    variant: member,
+                                    data: args,
+                                },
+                                line: dot_token.line,
+                                column: dot_token.column,
+                            };
+                        } else {
+                            expr = Expr {
+                                kind: ExprKind::MethodCall {
+                                    object: Box::new(expr),
+                                    method: member,
+                                    args,
+                                },
+                                line: dot_token.line,
+                                column: dot_token.column,
+                            };
+                        }
                     } else {
-                        expr = Expr {
-                            kind: ExprKind::FieldAccess {
-                                object: Box::new(expr),
-                                field: member,
-                            },
-                            line: dot_token.line,
-                            column: dot_token.column,
-                        };
+                        // Check if this is an enum variant access (EnumName.Variant without parens)
+                        let is_enum_variant = matches!(&expr.kind, ExprKind::Identifier(_))
+                            && member
+                                .chars()
+                                .next()
+                                .map(|c| c.is_uppercase())
+                                .unwrap_or(false);
+
+                        if is_enum_variant {
+                            let enum_name = match &expr.kind {
+                                ExprKind::Identifier(n) => n.clone(),
+                                _ => panic!("enum variant requires identifier"),
+                            };
+                            expr = Expr {
+                                kind: ExprKind::EnumVariant {
+                                    enum_name,
+                                    variant: member,
+                                },
+                                line: dot_token.line,
+                                column: dot_token.column,
+                            };
+                        } else {
+                            expr = Expr {
+                                kind: ExprKind::FieldAccess {
+                                    object: Box::new(expr),
+                                    field: member,
+                                },
+                                line: dot_token.line,
+                                column: dot_token.column,
+                            };
+                        }
                     }
                 }
                 _ => break,

@@ -20,7 +20,12 @@ impl Interpreter {
                 }
             }
             ExprKind::Boolean(b) => Ok(Value::Boolean(*b)),
-            ExprKind::Empty => Ok(Value::Maybe(None)),
+            ExprKind::Empty => Ok(Value::Option(None)),
+            ExprKind::Some(inner) => {
+                let val = self.evaluate_expression(inner)?;
+                Ok(Value::Option(Some(Box::new(val))))
+            }
+            ExprKind::None => Ok(Value::Option(None)),
             ExprKind::List(items) => {
                 let mut vals = Vec::new();
                 for item in items {
@@ -47,6 +52,7 @@ impl Interpreter {
                 ("float", "min") => Ok(Value::Float(f64::MIN)),
                 _ => Err(RuntimeError {
                     message: format!("'{}' has no constant '{}'", type_name, constant),
+                    file_path: String::new(),
                     line: expr.line,
                     column: expr.column,
                 }),
@@ -57,6 +63,7 @@ impl Interpreter {
                     Value::Boolean(b) => Ok(Value::Boolean(!b)),
                     _ => Err(RuntimeError {
                         message: format!("'not' requires a boolean, got {:?}", val),
+                        file_path: String::new(),
                         line: expr.line,
                         column: expr.column,
                     }),
@@ -68,6 +75,7 @@ impl Interpreter {
                     Some(val) => Ok(val.clone()),
                     None => Err(RuntimeError {
                         message: format!("Undefined variable: {}", name),
+                        file_path: String::new(),
                         line: expr.line,
                         column: expr.column,
                     }),
@@ -82,6 +90,7 @@ impl Interpreter {
                     }
                     None => Err(RuntimeError {
                         message: format!("Undefined variable in interpolation: {}", ident),
+                        file_path: String::new(),
                         line: expr.line,
                         column: expr.column,
                     }),
@@ -102,6 +111,7 @@ impl Interpreter {
                     if args.len() != 1 {
                         return Err(RuntimeError {
                             message: "int() takes exactly one argument".to_string(),
+                            file_path: String::new(),
                             line: expr.line,
                             column: expr.column,
                         });
@@ -112,6 +122,7 @@ impl Interpreter {
                     if args.len() != 1 {
                         return Err(RuntimeError {
                             message: "float() takes exactly one argument".to_string(),
+                            file_path: String::new(),
                             line: expr.line,
                             column: expr.column,
                         });
@@ -122,6 +133,7 @@ impl Interpreter {
                     if args.len() != 1 {
                         return Err(RuntimeError {
                             message: "string() takes exactly one argument".to_string(),
+                            file_path: String::new(),
                             line: expr.line,
                             column: expr.column,
                         });
@@ -138,6 +150,7 @@ impl Interpreter {
                     } else {
                         Err(RuntimeError {
                             message: format!("Unknown function: {}", name),
+                            file_path: String::new(),
                             line: expr.line,
                             column: expr.column,
                         })
@@ -155,6 +168,71 @@ impl Interpreter {
             ExprKind::StructInstantiate { name, fields } => {
                 let fields_cloned = fields.clone();
                 self.evaluate_struct_instantiate(name, &fields_cloned, expr.line, expr.column)
+            }
+            ExprKind::EnumVariant { enum_name, variant } => match self.enum_defs.get(enum_name) {
+                Some(variants) => {
+                    let has_variant = variants.iter().any(|v| v.name == *variant);
+                    if has_variant {
+                        Ok(Value::EnumVariant {
+                            enum_name: enum_name.clone(),
+                            variant: variant.clone(),
+                        })
+                    } else {
+                        Err(RuntimeError {
+                            message: format!(
+                                "'{}' is not a variant of enum '{}'",
+                                variant, enum_name
+                            ),
+                            file_path: String::new(),
+                            line: expr.line,
+                            column: expr.column,
+                        })
+                    }
+                }
+                None => Err(RuntimeError {
+                    message: format!("Unknown enum '{}'", enum_name),
+                    file_path: String::new(),
+                    line: expr.line,
+                    column: expr.column,
+                }),
+            },
+            ExprKind::EnumVariantData {
+                enum_name,
+                variant,
+                data,
+            } => {
+                let mut evaluated_data = Vec::new();
+                for d in data {
+                    evaluated_data.push(self.evaluate_expression(d)?);
+                }
+                match self.enum_defs.get(enum_name) {
+                    Some(variants) => {
+                        let has_variant = variants.iter().any(|v| v.name == *variant);
+                        if has_variant {
+                            Ok(Value::EnumVariantData {
+                                enum_name: enum_name.clone(),
+                                variant: variant.clone(),
+                                data: evaluated_data,
+                            })
+                        } else {
+                            Err(RuntimeError {
+                                message: format!(
+                                    "'{}' is not a variant of enum '{}'",
+                                    variant, enum_name
+                                ),
+                                file_path: String::new(),
+                                line: expr.line,
+                                column: expr.column,
+                            })
+                        }
+                    }
+                    None => Err(RuntimeError {
+                        message: format!("Unknown enum '{}'", enum_name),
+                        file_path: String::new(),
+                        line: expr.line,
+                        column: expr.column,
+                    }),
+                }
             }
             ExprKind::MethodCall {
                 object,

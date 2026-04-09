@@ -1,0 +1,33 @@
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+Color get_color() {
+    return Color.Red;
+}
+
+enum Result {
+    Ok(int),
+    Err(string),
+}
+
+Result ok_result(int val) {
+    return Result.Ok(val);
+}
+
+Result err_result(string msg) {
+    return Result.Err(msg);
+}
+
+void main() {
+    Color c = get_color();
+    print("got color");
+
+    Result r = ok_result(42);
+    print("got ok result");
+
+    Result e = err_result("oops");
+    print("got err result");
+}

@@ -51,7 +51,8 @@ impl Parser {
                     self.advance();
                     if let Err(e) = self.expect_token(TokenKind::Colon) {
                         self.errors.push(e);
-                        return None;
+                        self.synchronize();
+                        continue;
                     }
                     let mut body = Vec::new();
                     while let Some(t) = self.current_token().cloned() {
@@ -117,7 +118,8 @@ impl Parser {
                     }
                     if let Err(e) = self.expect_token(TokenKind::Colon) {
                         self.errors.push(e);
-                        return None;
+                        self.synchronize();
+                        continue;
                     }
 
                     let mut body = Vec::new();
@@ -150,12 +152,16 @@ impl Parser {
 
                     if let Err(e) = self.expect_token(TokenKind::Colon) {
                         self.errors.push(e);
-                        return None;
+                        self.synchronize();
+                        continue;
                     }
 
                     let pattern = match &expr.kind {
                         ExprKind::Integer(n) => MatchPattern::Integer(*n),
                         ExprKind::String(s) => MatchPattern::String(s.clone()),
+                        ExprKind::EnumVariant { enum_name, variant } => {
+                            MatchPattern::EnumVariant(enum_name.clone(), variant.clone())
+                        }
                         ExprKind::Call { name, args } if name == "range" && args.len() == 2 => {
                             if let (ExprKind::Integer(s), ExprKind::Integer(e)) =
                                 (&args[0].kind, &args[1].kind)
@@ -215,6 +221,15 @@ impl Parser {
             Some(TokenKind::StringLiteral(_)) => true,
             Some(TokenKind::LParen) => true,
             Some(TokenKind::Identifier(name)) if name == "range" => true,
+            // Enum variant pattern: Color.Red
+            Some(TokenKind::Identifier(_))
+                if matches!(
+                    self.tokens.get(self.position + 1),
+                    Some(t) if t.kind == TokenKind::Dot
+                ) =>
+            {
+                true
+            }
             _ => false,
         }
     }

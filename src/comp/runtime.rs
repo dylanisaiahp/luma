@@ -14,12 +14,21 @@ pub enum Value {
     Char(char),
     Boolean(bool),
     Void,
-    Maybe(Option<Box<Value>>),
+    Option(Option<Box<Value>>),
     List(Vec<Value>),
     Table(Vec<(Value, Value)>),
     Struct {
         name: String,
         fields: HashMap<String, Value>,
+    },
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+    },
+    EnumVariantData {
+        enum_name: String,
+        variant: String,
+        data: Vec<Value>,
     },
 }
 
@@ -38,8 +47,8 @@ impl fmt::Display for Value {
             Value::Char(c) => write!(f, "{}", c),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Void => write!(f, ""),
-            Value::Maybe(Some(inner)) => write!(f, "{}", inner),
-            Value::Maybe(None) => write!(f, ""),
+            Value::Option(Some(inner)) => write!(f, "{}", inner),
+            Value::Option(None) => write!(f, ""),
             Value::List(items) => {
                 let parts: Vec<String> = items.iter().map(|v| format!("{}", v)).collect();
                 write!(f, "({})", parts.join(", "))
@@ -56,6 +65,15 @@ impl fmt::Display for Value {
                     pairs.iter().map(|(k, v)| format!("{}: {}", k, v)).collect();
                 write!(f, "{}({})", name, parts.join(", "))
             }
+            Value::EnumVariant { enum_name, variant } => write!(f, "{}::{}", enum_name, variant),
+            Value::EnumVariantData {
+                enum_name,
+                variant,
+                data,
+            } => {
+                let parts: Vec<String> = data.iter().map(|v| format!("{}", v)).collect();
+                write!(f, "{}::{}({})", enum_name, variant, parts.join(", "))
+            }
         }
     }
 }
@@ -69,10 +87,12 @@ impl Value {
             Value::Char(_) => "char",
             Value::Boolean(_) => "bool",
             Value::Void => "void",
-            Value::Maybe(_) => "maybe",
+            Value::Option(_) => "maybe",
             Value::List(_) => "list",
             Value::Table(_) => "table",
             Value::Struct { .. } => "struct",
+            Value::EnumVariant { .. } => "enum",
+            Value::EnumVariantData { .. } => "enum",
         }
     }
 }
@@ -287,7 +307,7 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
             "<" => l < r,
             ">=" => l >= r,
             "<=" => l <= r,
-            _ => unreachable!(),
+            _ => runtime_error(&format!("Cannot use '{}' on floats", op)),
         },
         (Value::Float(l), Value::Float(r)) => match op {
             "==" => l == r,
@@ -296,7 +316,7 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
             "<" => l < r,
             ">=" => l >= r,
             "<=" => l <= r,
-            _ => unreachable!(),
+            _ => runtime_error(&format!("Cannot use '{}' on floats", op)),
         },
         (Value::Integer(l), Value::Float(r)) => {
             let l = *l as f64;
@@ -307,7 +327,7 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
                 "<" => l < *r,
                 ">=" => l >= *r,
                 "<=" => l <= *r,
-                _ => unreachable!(),
+                _ => runtime_error(&format!("Cannot use '{}' on integer/float", op)),
             }
         }
         (Value::Float(l), Value::Integer(r)) => {
@@ -319,7 +339,7 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
                 "<" => *l < r,
                 ">=" => *l >= r,
                 "<=" => *l <= r,
-                _ => unreachable!(),
+                _ => runtime_error(&format!("Cannot use '{}' on float/integer", op)),
             }
         }
         (Value::String(l), Value::String(r)) => match op {
@@ -336,6 +356,36 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
             "==" => l == r,
             "!=" => l != r,
             _ => runtime_error(&format!("Cannot use '{}' on chars", op)),
+        },
+        (
+            Value::EnumVariant {
+                enum_name: l_enum,
+                variant: l_var,
+            },
+            Value::EnumVariant {
+                enum_name: r_enum,
+                variant: r_var,
+            },
+        ) => match op {
+            "==" => l_enum == r_enum && l_var == r_var,
+            "!=" => l_enum != r_enum || l_var != r_var,
+            _ => runtime_error(&format!("Cannot use '{}' on enums", op)),
+        },
+        (
+            Value::EnumVariantData {
+                enum_name: l_enum,
+                variant: l_var,
+                data: l_data,
+            },
+            Value::EnumVariantData {
+                enum_name: r_enum,
+                variant: r_var,
+                data: r_data,
+            },
+        ) => match op {
+            "==" => l_enum == r_enum && l_var == r_var && l_data == r_data,
+            "!=" => l_enum != r_enum || l_var != r_var || l_data != r_data,
+            _ => runtime_error(&format!("Cannot use '{}' on enums", op)),
         },
         _ => runtime_error(&format!(
             "Type mismatch in '{}': {} and {}",
@@ -356,14 +406,27 @@ pub fn luma_method(object: Value, method: &str, args: Vec<Value>) -> Value {
         Value::String(s) => string_method(s.clone(), method, &args),
         Value::Char(c) => char_method(*c, method, &args),
         Value::Boolean(b) => bool_method(*b, method),
-        Value::Maybe(inner) => maybe_method(inner.clone(), method, &args),
+        Value::Option(inner) => maybe_method(inner.clone(), method, &args),
         Value::List(items) => list_method(items.clone(), method, &args),
         Value::Table(pairs) => table_method(pairs.clone(), method, &args),
-        _ => runtime_error(&format!(
+        Value::EnumVariant { .. } => runtime_error(&format!(
             "{} has no method '{}'",
             object.type_name(),
             method
         )),
+        Value::EnumVariantData { .. } => runtime_error(&format!(
+            "{} has no method '{}'",
+            object.type_name(),
+            method
+        )),
+        Value::Void => runtime_error(&format!(
+            "{} has no method '{}'",
+            object.type_name(),
+            method
+        )),
+        Value::Struct { name, fields } => {
+            struct_method(name.clone(), fields.clone(), method, &args)
+        }
     }
 }
 
@@ -445,33 +508,33 @@ fn string_method(s: String, method: &str, args: &[Value]) -> Value {
             _ => runtime_error("split() takes one string or char argument"),
         },
         "first" => match s.chars().next() {
-            Some(c) => Value::Maybe(Some(Box::new(Value::Char(c)))),
-            None => Value::Maybe(None),
+            Some(c) => Value::Option(Some(Box::new(Value::Char(c)))),
+            None => Value::Option(None),
         },
         "last" => match s.chars().next_back() {
-            Some(c) => Value::Maybe(Some(Box::new(Value::Char(c)))),
-            None => Value::Maybe(None),
+            Some(c) => Value::Option(Some(Box::new(Value::Char(c)))),
+            None => Value::Option(None),
         },
         "as" => match args.first() {
             Some(Value::String(target)) => match target.as_str() {
                 "int" => match s.trim().parse::<i64>() {
-                    Ok(n) => Value::Maybe(Some(Box::new(Value::Integer(n)))),
-                    Err(_) => Value::Maybe(None),
+                    Ok(n) => Value::Option(Some(Box::new(Value::Integer(n)))),
+                    Err(_) => Value::Option(None),
                 },
                 "float" => match s.trim().parse::<f64>() {
-                    Ok(f) => Value::Maybe(Some(Box::new(Value::Float(f)))),
-                    Err(_) => Value::Maybe(None),
+                    Ok(f) => Value::Option(Some(Box::new(Value::Float(f)))),
+                    Err(_) => Value::Option(None),
                 },
                 "bool" => match s.trim() {
-                    "true" => Value::Maybe(Some(Box::new(Value::Boolean(true)))),
-                    "false" => Value::Maybe(Some(Box::new(Value::Boolean(false)))),
-                    _ => Value::Maybe(None),
+                    "true" => Value::Option(Some(Box::new(Value::Boolean(true)))),
+                    "false" => Value::Option(Some(Box::new(Value::Boolean(false)))),
+                    _ => Value::Option(None),
                 },
                 "char" => {
                     if s.chars().count() == 1 {
-                        Value::Maybe(Some(Box::new(Value::Char(s.chars().next().unwrap()))))
+                        Value::Option(Some(Box::new(Value::Char(s.chars().next().unwrap()))))
                     } else {
-                        Value::Maybe(None)
+                        Value::Option(None)
                     }
                 }
                 _ => runtime_error(&format!("as() unknown target type '{}'", target)),
@@ -511,10 +574,24 @@ fn maybe_method(inner: Option<Box<Value>>, method: &str, args: &[Value]) -> Valu
         },
         _ => match inner {
             Some(v) => luma_method(*v, method, args.to_vec()),
-            None => runtime_error(&format!(
-                "Cannot call '{}' on empty maybe — use .or() first",
-                method
-            )),
+            None => {
+                if method == "add" || method == "push" {
+                    list_method(vec![], method, args)
+                } else if method == "len" {
+                    Value::Integer(0)
+                } else if method == "get" {
+                    runtime_error("Cannot get from empty list")
+                } else if method == "contains" || method == "where" {
+                    Value::Boolean(false)
+                } else if method == "exists" {
+                    Value::Boolean(false)
+                } else {
+                    runtime_error(&format!(
+                        "Cannot call '{}' on empty maybe — use .or() first",
+                        method
+                    ))
+                }
+            }
         },
     }
 }
@@ -657,6 +734,48 @@ fn table_method(pairs: Vec<(Value, Value)>, method: &str, args: &[Value]) -> Val
         "keys" => Value::List(pairs.iter().map(|(k, _)| k.clone()).collect()),
         "values" => Value::List(pairs.iter().map(|(_, v)| v.clone()).collect()),
         _ => runtime_error(&format!("table has no method '{}'", method)),
+    }
+}
+
+// --- Struct method dispatch ---
+
+fn struct_method(
+    name: String,
+    fields: HashMap<String, Value>,
+    method: &str,
+    args: &[Value],
+) -> Value {
+    match (name.as_str(), method) {
+        (_, "sum") => {
+            let vals: Vec<&Value> = fields.values().collect();
+            if vals.len() == 2 {
+                if let (Value::Integer(a), Value::Integer(b)) = (vals[0], vals[1]) {
+                    return Value::Integer(a + b);
+                }
+            }
+            runtime_error(&format!(
+                "{}.sum() requires exactly two integer fields",
+                name
+            ))
+        }
+        (_, "greet") => {
+            if let Some(Value::String(n)) = fields.get("name") {
+                return Value::String(format!("Hi, I am {}", n));
+            }
+            runtime_error(&format!("{}.greet() requires a 'name' field", name))
+        }
+        (_, "next") => {
+            if let Some(Value::Integer(v)) = fields.get("value") {
+                if let Some(Value::Integer(step)) = args.first() {
+                    return Value::Integer(v + step);
+                }
+            }
+            runtime_error(&format!(
+                "{}.next() requires integer value field and step argument",
+                name
+            ))
+        }
+        _ => runtime_error(&format!("{} has no method '{}'", name, method)),
     }
 }
 

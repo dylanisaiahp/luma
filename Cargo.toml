@@ -17,6 +17,7 @@ anyhow = "1.0.102"
 ariadne = "0.6.0"
 clap = { version = "4.5.60", features = ["derive"] }
 colored = "3.1.1"
+dirs = "6.0"
 rand = "0.10.0"
 thiserror = "2.0.18"
 ureq = "3.2.0"
@@ -25,5 +26,6 @@ ureq = "3.2.0"
 opt-level = 3          # optimize for speed (Rust default)
 lto = "thin"           # faster than full LTO, still good
 strip = true           # keep binary size down
+overflow-checks = true # catch arithmetic overflow bugs
 # codegen-units = 1    # probably not needed yet
 # panic = "abort"      # maybe later if you really need tiny

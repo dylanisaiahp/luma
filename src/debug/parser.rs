@@ -2,9 +2,9 @@
 use crate::ast::Stmt;
 use crate::debug::format::{self, level_tag, parser_tag};
 
-pub fn print_parser_debug(statements: &[Stmt], error_count: usize, verbose: bool) {
+pub fn print_parser_debug(statements: &[Stmt], error_count: usize, verbose: bool, filename: &str) {
     let tag = parser_tag();
-    let level = level_tag(verbose);
+    let level = level_tag(verbose, Some(filename));
 
     let functions: Vec<&Stmt> = statements
         .iter()

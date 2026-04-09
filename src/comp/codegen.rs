@@ -6,6 +6,10 @@ pub struct Codegen {
     output: String,
     indent: usize,
     var_counter: usize,
+    current_return_type: String,
+    struct_methods: Vec<(String, String)>,
+    emitted_functions: std::collections::HashSet<String>,
+    mutated_vars: std::collections::HashSet<String>,
 }
 
 impl Default for Codegen {
@@ -20,6 +24,138 @@ impl Codegen {
             output: String::new(),
             indent: 0,
             var_counter: 0,
+            current_return_type: "void".to_string(),
+            struct_methods: Vec::new(),
+            emitted_functions: std::collections::HashSet::new(),
+            mutated_vars: std::collections::HashSet::new(),
+        }
+    }
+
+    fn collect_mutated_vars(&mut self, stmts: &[Stmt]) {
+        for stmt in stmts {
+            self.collect_from_stmt(stmt);
+        }
+    }
+
+    fn collect_from_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.collect_from_expr(expr);
+            }
+            Stmt::Function { body, .. } => {
+                for s in body {
+                    self.collect_from_stmt(s);
+                }
+            }
+            Stmt::If {
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                for s in then_branch {
+                    self.collect_from_stmt(s);
+                }
+                if let Some(else_stmts) = else_branch {
+                    for s in else_stmts {
+                        self.collect_from_stmt(s);
+                    }
+                }
+            }
+            Stmt::While { body, .. } => {
+                for s in body {
+                    self.collect_from_stmt(s);
+                }
+            }
+            Stmt::For { body, .. } => {
+                for s in body {
+                    self.collect_from_stmt(s);
+                }
+            }
+            Stmt::ForIn { body, .. } => {
+                for s in body {
+                    self.collect_from_stmt(s);
+                }
+            }
+            Stmt::ForInTable { body, .. } => {
+                for s in body {
+                    self.collect_from_stmt(s);
+                }
+            }
+            Stmt::Match { arms, else_arm, .. } => {
+                for arm in arms {
+                    for s in &arm.body {
+                        self.collect_from_stmt(s);
+                    }
+                }
+                if let Some(else_stmts) = else_arm {
+                    for s in else_stmts {
+                        self.collect_from_stmt(s);
+                    }
+                }
+            }
+            Stmt::Program(stmts) => {
+                for s in stmts {
+                    self.collect_from_stmt(s);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_from_expr(&mut self, expr: &Expr) {
+        match &expr.kind {
+            ExprKind::Assign { name, .. } => {
+                self.mutated_vars.insert(name.clone());
+            }
+            ExprKind::AssignOp { name, .. } => {
+                self.mutated_vars.insert(name.clone());
+            }
+            ExprKind::BinaryOp { left, right, .. } => {
+                self.collect_from_expr(left);
+                self.collect_from_expr(right);
+            }
+            ExprKind::Not(operand) => {
+                self.collect_from_expr(operand);
+            }
+            ExprKind::Some(inner) => {
+                self.collect_from_expr(inner);
+            }
+            ExprKind::Call { args, .. } => {
+                for arg in args {
+                    self.collect_from_expr(arg);
+                }
+            }
+            ExprKind::MethodCall { object, args, .. } => {
+                self.collect_from_expr(object);
+                for arg in args {
+                    self.collect_from_expr(arg);
+                }
+            }
+            ExprKind::FieldAccess { object, .. } => {
+                self.collect_from_expr(object);
+            }
+            ExprKind::StructInstantiate { fields, .. } => {
+                for (_, val) in fields {
+                    self.collect_from_expr(val);
+                }
+            }
+            ExprKind::EnumVariantData { data, .. } => {
+                for d in data {
+                    self.collect_from_expr(d);
+                }
+            }
+            ExprKind::List(items) => {
+                for item in items {
+                    self.collect_from_expr(item);
+                }
+            }
+            ExprKind::Table(pairs) => {
+                for (key, val) in pairs {
+                    self.collect_from_expr(key);
+                    self.collect_from_expr(val);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -30,6 +166,19 @@ impl Codegen {
         self.emit_line("use luma_runtime::*;");
         self.emit_line("");
 
+        // Collect variables that are mutated (reassigned) for making them mutable
+        self.collect_mutated_vars(stmts);
+
+        // Collect struct methods for dispatch
+        for stmt in stmts {
+            if let Stmt::StructDeclaration { name, methods, .. } = stmt {
+                for method in methods {
+                    self.struct_methods
+                        .push((name.clone(), method.name.clone()));
+                }
+            }
+        }
+
         // Collect and emit all function/struct declarations first
         for stmt in stmts {
             match stmt {
@@ -37,6 +186,27 @@ impl Codegen {
                 Stmt::Function { name, .. } if name != "main" => self.emit_stmt(stmt),
                 _ => {}
             }
+        }
+
+        // Emit struct dispatch function
+        if !self.struct_methods.is_empty() {
+            let methods = self.struct_methods.clone();
+            self.emit_line("fn luma_struct_dispatch(struct_name: &str, fields: std::collections::HashMap<String, Value>, method: &str, args: Vec<Value>) -> Value {");
+            self.indent += 1;
+            self.emit_line("match (struct_name, method) {");
+            self.indent += 1;
+            for (struct_name, method_name) in &methods {
+                self.emit_line(&format!(
+                    "(\"{}\", \"{}\") => luma_struct_{}_{}(&fields, args),",
+                    struct_name, method_name, struct_name, method_name
+                ));
+            }
+            self.emit_line("_ => luma_runtime::runtime_error(&format!(\"{} has no method '{}'\", struct_name, method))");
+            self.indent -= 1;
+            self.emit_line("}");
+            self.indent -= 1;
+            self.emit_line("}");
+            self.emit_line("");
         }
 
         // Emit main
@@ -75,7 +245,13 @@ impl Codegen {
                 body,
                 return_type,
             } => {
+                // Skip if we've already emitted this function (deduplication)
+                if !self.emitted_functions.insert(name.clone()) {
+                    return;
+                }
+
                 if name == "main" {
+                    self.current_return_type = "void".to_string();
                     self.emit_line("fn main() {");
                 } else {
                     let params_str = params
@@ -88,52 +264,76 @@ impl Codegen {
                     } else {
                         " -> Value".to_string()
                     };
+                    self.current_return_type = return_type.clone();
                     self.emit_line(&format!("fn luma_fn_{}({}){} {{", name, params_str, ret));
                 }
                 self.indent += 1;
                 for s in body {
                     self.emit_stmt(s);
                 }
-                if return_type == "void" {
-                    // no return needed
-                }
                 self.indent -= 1;
                 self.emit_line("}");
                 self.emit_line("");
             }
 
-            Stmt::StructDeclaration { name, methods, .. } => {
+            Stmt::StructDeclaration {
+                name,
+                fields,
+                methods,
+            } => {
                 for method in methods {
-                    let params_str = method
-                        .params
-                        .iter()
-                        .map(|p| format!("{}: Value", p.name))
-                        .collect::<Vec<_>>()
-                        .join(", ");
                     let ret = if method.return_type == "void" {
                         String::new()
                     } else {
                         " -> Value".to_string()
                     };
                     self.emit_line(&format!(
-                        "fn luma_struct_{}_{}(fields: &std::collections::HashMap<String, Value>, {}){} {{",
-                        name, method.name, params_str, ret
+                        "fn luma_struct_{}_{}(fields: &std::collections::HashMap<String, Value>, args: Vec<Value>){} {{",
+                        name, method.name, ret
                     ));
                     self.indent += 1;
-                    // inject fields as local vars
-                    self.emit_line("// struct fields available as variables");
+                    for field in fields {
+                        self.emit_line(&format!(
+                            "let {} = fields.get(\"{}\").cloned().unwrap_or_else(|| luma_runtime::runtime_error(\"field '{}' not found on {}\"));",
+                            field.name, field.name, field.name, name
+                        ));
+                    }
+                    for (i, param) in method.params.iter().enumerate() {
+                        self.emit_line(&format!(
+                            "let {} = args.get({}).cloned().unwrap_or_else(|| luma_runtime::runtime_error(\"missing argument '{}' on {}\"));",
+                            param.name, i, param.name, method.name
+                        ));
+                    }
+                    let prev_return = self.current_return_type.clone();
+                    self.current_return_type = method.return_type.clone();
                     for s in &method.body {
                         self.emit_stmt(s);
                     }
+                    self.current_return_type = prev_return;
                     self.indent -= 1;
                     self.emit_line("}");
                     self.emit_line("");
                 }
             }
 
-            Stmt::VariableDeclaration { name, value, .. } => {
+            Stmt::EnumDeclaration { .. } => {
+                // enums handled at load time, not emitted
+            }
+
+            Stmt::VariableDeclaration {
+                name,
+                value,
+                mutable,
+                ..
+            } => {
                 let expr = self.emit_expr(value);
-                self.emit_line(&format!("let mut {} = {};", name, expr));
+                let is_mut = *mutable || self.mutated_vars.contains(name);
+                let decl = if is_mut {
+                    format!("let mut {} = {};", name, expr)
+                } else {
+                    format!("let {} = {};", name, expr)
+                };
+                self.emit_line(&decl);
             }
 
             Stmt::Print(expr) => {
@@ -148,11 +348,46 @@ impl Codegen {
 
             Stmt::Return(Some(expr)) => {
                 let e = self.emit_expr(expr);
-                self.emit_line(&format!("return {};", e));
+                // Strip outer braces for single-line block expressions to avoid Rust warning
+                let e = if !e.contains('\n') && e.starts_with('{') && e.ends_with('}') {
+                    let inner = &e[1..e.len() - 1];
+                    // Only strip if it's a simple pattern (if-let, etc.)
+                    if inner.trim_start().starts_with("if ") || inner.trim_start().starts_with('{')
+                    {
+                        inner.to_string()
+                    } else {
+                        e
+                    }
+                } else {
+                    e
+                };
+                if self.current_return_type == "void" {
+                    self.emit_line(&format!("{};", e));
+                    self.emit_line("return;");
+                } else if self.current_return_type.starts_with("option(") {
+                    let already_option = matches!(
+                        &expr.kind,
+                        ExprKind::Empty
+                            | ExprKind::Some(_)
+                            | ExprKind::None
+                            | ExprKind::Identifier(_)
+                    );
+                    if already_option {
+                        self.emit_line(&format!("return {};", e));
+                    } else {
+                        self.emit_line(&format!("return Value::Option(Some(Box::new({})));", e));
+                    }
+                } else {
+                    self.emit_line(&format!("return {};", e));
+                }
             }
 
             Stmt::Return(None) => {
-                self.emit_line("return;");
+                if self.current_return_type == "void" {
+                    self.emit_line("return;");
+                } else {
+                    self.emit_line("return Value::Void;");
+                }
             }
 
             Stmt::Break => {
@@ -264,7 +499,9 @@ impl Codegen {
             } => {
                 let val = self.emit_expr(value);
                 let tmp = self.fresh_var();
+                let result = self.fresh_var();
                 self.emit_line(&format!("let {} = {};", tmp, val));
+                self.emit_line(&format!("let mut {} = Value::Void;", result));
                 self.emit_line("{");
                 self.indent += 1;
                 self.emit_line("let mut _luma_matched = false;");
@@ -287,9 +524,18 @@ impl Codegen {
                     }
                     self.indent -= 1;
                     self.emit_line("}");
+                } else {
+                    self.emit_line("if !_luma_matched {");
+                    self.indent += 1;
+                    self.emit_line("luma_runtime::runtime_error(\"match must be exhaustive\");");
+                    self.indent -= 1;
+                    self.emit_line("}");
                 }
                 self.indent -= 1;
                 self.emit_line("}");
+                if self.current_return_type != "void" {
+                    self.emit_line(&result.to_string());
+                }
             }
 
             Stmt::Raise { message, .. } => {
@@ -318,10 +564,15 @@ impl Codegen {
                 format!("matches!({}, Value::Integer({}))", val_var, n)
             }
             MatchPattern::String(s) => {
+                let escaped = s
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n")
+                    .replace('\r', "\\r")
+                    .replace('\t', "\\t");
                 format!(
                     "matches!({}, Value::String(ref _s) if _s == \"{}\")",
-                    val_var,
-                    s.replace('"', "\\\"")
+                    val_var, escaped
                 )
             }
             MatchPattern::Range(start, end) => {
@@ -337,6 +588,12 @@ impl Codegen {
                     .collect();
                 format!("({})", parts.join(" || "))
             }
+            MatchPattern::EnumVariant(enum_name, variant) => {
+                format!(
+                    "matches!({}, Value::EnumVariant {{ enum_name: ref _e, variant: ref _v }} if _e == \"{}\" && _v == \"{}\")",
+                    val_var, enum_name, variant
+                )
+            }
         }
     }
 
@@ -347,16 +604,22 @@ impl Codegen {
             ExprKind::Integer(n) => format!("Value::Integer({})", n),
             ExprKind::Float(f) => format!("Value::Float({}f64)", f),
             ExprKind::Boolean(b) => format!("Value::Boolean({})", b),
-            ExprKind::Empty => "Value::Maybe(None)".to_string(),
+            ExprKind::Empty => "Value::Option(None)".to_string(),
+            ExprKind::Some(inner) => {
+                let inner_code = self.emit_expr(inner);
+                format!("Value::Option(Some(Box::new({})))", inner_code)
+            }
+            ExprKind::None => "Value::Option(None)".to_string(),
 
             ExprKind::String(s) => {
-                format!(
-                    "Value::String(\"{}\".to_string())",
-                    s.replace('\\', "\\\\")
-                        .replace('"', "\\\"")
-                        .replace('\n', "\\n")
-                        .replace('\t', "\\t")
-                )
+                let escaped = s
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n")
+                    .replace('\r', "\\r")
+                    .replace('\t', "\\t")
+                    .replace('\0', "\\0");
+                format!("Value::String(\"{}\".to_string())", escaped)
             }
 
             ExprKind::Char(s) => {
@@ -444,12 +707,20 @@ impl Codegen {
                     "string" => format!("luma_string(&{})", arg_exprs[0]),
                     "input" => "Value::Void".to_string(), // handle via method
                     "fetch" => {
-                        format!("Value::String({})", arg_exprs[0])
-                        // fetch handle stored as string url, method dispatch resolves it
+                        if arg_exprs.is_empty() {
+                            "luma_runtime::runtime_error(\"fetch() requires exactly one argument\")"
+                                .to_string()
+                        } else {
+                            format!("Value::String({})", arg_exprs[0])
+                        }
                     }
                     "file" => {
-                        // file handle stored as string path
-                        arg_exprs[0].clone()
+                        if arg_exprs.is_empty() {
+                            "luma_runtime::runtime_error(\"file() requires exactly one argument\")"
+                                .to_string()
+                        } else {
+                            arg_exprs[0].clone()
+                        }
                     }
                     "run" => {
                         let parts = arg_exprs
@@ -473,37 +744,69 @@ impl Codegen {
             } => {
                 let obj = self.emit_expr(object);
                 let arg_exprs: Vec<String> = args.iter().map(|a| self.emit_expr(a)).collect();
-                let args_vec = if arg_exprs.is_empty() {
-                    "vec![]".to_string()
+                let args_slice = if arg_exprs.is_empty() {
+                    "&[]".to_string()
                 } else {
-                    format!("vec![{}]", arg_exprs.join(", "))
+                    format!("&[{}]", arg_exprs.join(", "))
                 };
 
                 // Special cases for fetch/file/input which need path/url
                 match &object.kind {
                     ExprKind::Call { name, .. } if name == "file" => {
-                        let path_expr = self.emit_expr(&args[0]);
-                        let path_str = format!(
-                            "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires a string path\") }}",
-                            path_expr
-                        );
-                        let _ = path_str; // suppress warning
-                        format!(
-                            "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires string\") }}; luma_file_method(&_path, \"{}\", {}) }}",
-                            obj, method, args_vec
-                        )
+                        if args.is_empty() {
+                            let path_expr = "luma_runtime::runtime_error(\"file() requires exactly one argument\")";
+                            let path_str = format!(
+                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires a string path\") }}",
+                                path_expr
+                            );
+                            let _ = path_str; // suppress warning
+                            format!(
+                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires string\") }}; luma_file_method(&_path, \"{}\", {}) }}",
+                                obj, method, args_slice
+                            )
+                        } else {
+                            let path_expr = self.emit_expr(&args[0]);
+                            let path_str = format!(
+                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires a string path\") }}",
+                                path_expr
+                            );
+                            let _ = path_str; // suppress warning
+                            format!(
+                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires string\") }}; luma_file_method(&_path, \"{}\", {}) }}",
+                                obj, method, args_slice
+                            )
+                        }
                     }
                     ExprKind::Call { name, .. } if name == "fetch" => {
-                        format!(
-                            "{{ let _obj = {}; let _url = if let Value::String(ref u) = _obj {{ u.clone() }} else {{ luma_runtime::runtime_error(\"fetch() requires string\") }}; luma_fetch_method(&_url, \"{}\", {}) }}",
-                            obj, method, args_vec
-                        )
+                        if args.is_empty() {
+                            format!(
+                                "{{ let _obj = {}; let _url = luma_runtime::runtime_error(\"fetch() requires exactly one argument\"); luma_fetch_method(&_url, \"{}\", {}) }}",
+                                obj, method, args_slice
+                            )
+                        } else {
+                            format!(
+                                "{{ let _obj = {}; let _url = if let Value::String(ref u) = _obj {{ u.clone() }} else {{ luma_runtime::runtime_error(\"fetch() requires string\") }}; luma_fetch_method(&_url, \"{}\", {}) }}",
+                                obj, method, args_slice
+                            )
+                        }
                     }
                     ExprKind::Call { name, .. } if name == "input" => {
                         format!("luma_input_method(\"{}\")", method)
                     }
                     _ => {
-                        format!("luma_method({}, \"{}\", {})", obj, method, args_vec)
+                        let args_vec = if arg_exprs.is_empty() {
+                            "vec![]".to_string()
+                        } else {
+                            format!("vec![{}]", arg_exprs.join(", "))
+                        };
+                        if self.struct_methods.is_empty() {
+                            format!("luma_method({}, \"{}\", {})", obj, method, args_vec)
+                        } else {
+                            format!(
+                                "{{ let _obj = {}; let _method = \"{}\"; let _args = {}; if let Value::Struct {{ ref name, ref fields }} = _obj {{ luma_struct_dispatch(name, fields.clone(), _method, _args) }} else {{ luma_method(_obj, _method, _args) }} }}",
+                                obj, method, args_vec
+                            )
+                        }
                     }
                 }
             }
@@ -528,6 +831,27 @@ impl Codegen {
                 format!(
                     "{{ let mut _fields = std::collections::HashMap::new(); {} Value::Struct {{ name: \"{}\".to_string(), fields: _fields }} }}",
                     field_inserts, name
+                )
+            }
+
+            ExprKind::EnumVariant { enum_name, variant } => {
+                format!(
+                    "Value::EnumVariant {{ enum_name: \"{}\".to_string(), variant: \"{}\".to_string() }}",
+                    enum_name, variant
+                )
+            }
+
+            ExprKind::EnumVariantData {
+                enum_name,
+                variant,
+                data,
+            } => {
+                let data_exprs: Vec<String> = data.iter().map(|d| self.emit_expr(d)).collect();
+                format!(
+                    "Value::EnumVariantData {{ enum_name: \"{}\".to_string(), variant: \"{}\".to_string(), data: vec![{}] }}",
+                    enum_name,
+                    variant,
+                    data_exprs.join(", ")
                 )
             }
 

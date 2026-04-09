@@ -27,6 +27,7 @@ pub fn eval_method(
             Some(result) => result,
             None => Err(RuntimeError {
                 message: format!("int has no method '{}'", method),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -35,6 +36,7 @@ pub fn eval_method(
             Some(result) => result,
             None => Err(RuntimeError {
                 message: format!("float has no method '{}'", method),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -46,18 +48,23 @@ pub fn eval_method(
             "exists" => Ok(Value::Boolean(*b)),
             _ => Err(RuntimeError {
                 message: format!("bool has no method '{}'", method),
+                file_path: String::new(),
                 line,
                 column,
             }),
         },
-        Value::Maybe(inner) => match method {
+        Value::Option(inner) => match method {
             "exists" => Ok(Value::Boolean(inner.is_some())),
             "or" => match inner {
-                Some(inner) => Ok(*inner.clone()),
+                Some(inner) => {
+                    let result = (*inner.clone()).clone();
+                    Ok(result)
+                }
                 None => match args.first() {
                     Some(v) => Ok(v.clone()),
                     None => Err(RuntimeError {
-                        message: "maybe.or() requires a fallback value".to_string(),
+                        message: "option.or() requires a fallback value".to_string(),
+                        file_path: String::new(),
                         line,
                         column,
                     }),
@@ -67,9 +74,10 @@ pub fn eval_method(
                 Some(inner) => eval_method(*inner.clone(), method, args, line, column),
                 None => Err(RuntimeError {
                     message: format!(
-                        "Cannot call '{}' on empty maybe — use .or() to provide a fallback first",
+                        "Cannot call '{}' on empty option — use .or() to provide a fallback first",
                         method
                     ),
+                    file_path: String::new(),
                     line,
                     column,
                 }),
@@ -85,11 +93,25 @@ pub fn eval_method(
                 "struct '{}' has no builtin methods — use defined methods instead",
                 name
             ),
+            file_path: String::new(),
+            line,
+            column,
+        }),
+        Value::EnumVariant { enum_name, .. } => Err(RuntimeError {
+            message: format!("enum '{}' has no builtin methods", enum_name),
+            file_path: String::new(),
+            line,
+            column,
+        }),
+        Value::EnumVariantData { enum_name, .. } => Err(RuntimeError {
+            message: format!("enum '{}' has no builtin methods", enum_name),
+            file_path: String::new(),
             line,
             column,
         }),
         Value::Void => Err(RuntimeError {
             message: format!("void has no method '{}'", method),
+            file_path: String::new(),
             line,
             column,
         }),

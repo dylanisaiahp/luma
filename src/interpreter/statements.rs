@@ -30,8 +30,8 @@ impl Interpreter {
             }
             Value::Boolean(b) => b.to_string(),
             Value::Void => String::new(),
-            Value::Maybe(Some(inner)) => self.value_to_display_string(inner),
-            Value::Maybe(None) => String::new(),
+            Value::Option(Some(inner)) => self.value_to_display_string(inner),
+            Value::Option(None) => String::new(),
             Value::List(items) => {
                 let parts: Vec<String> = items
                     .iter()
@@ -64,6 +64,21 @@ impl Interpreter {
                     .collect();
                 format!("{}({})", name, parts.join(", "))
             }
+            // Enum variants display as EnumName.Variant
+            Value::EnumVariant { enum_name, variant } => {
+                format!("{}.{}", enum_name, variant)
+            }
+            Value::EnumVariantData {
+                enum_name,
+                variant,
+                data,
+            } => {
+                let data_strs: Vec<String> = data
+                    .iter()
+                    .map(|v| self.value_to_display_string(v))
+                    .collect();
+                format!("{}.{}({})", enum_name, variant, data_strs.join(", "))
+            }
         }
     }
 
@@ -72,6 +87,7 @@ impl Interpreter {
         type_name: &str,
         name: &str,
         value: &crate::ast::Expr,
+        mutable: bool,
         else_error: &Option<(String, Vec<crate::ast::Stmt>)>,
     ) -> Result<Value, RuntimeError> {
         let val = match self.evaluate_expression(value) {
@@ -97,6 +113,7 @@ impl Interpreter {
                             .strip_prefix("__raise__")
                             .unwrap_or(&e.message)
                             .to_string(),
+                        file_path: String::new(),
                         line: e.line,
                         column: e.column,
                     });
@@ -111,7 +128,7 @@ impl Interpreter {
             ("bool", Value::Boolean(b)) => Value::Boolean(b),
             ("string", Value::String(s)) => Value::String(s),
 
-            // char — from CharLiteral (Char variant) or single-char string
+            // char
             ("char", Value::Char(c)) => Value::Char(c),
             ("char", Value::String(s)) if s.chars().count() == 1 => {
                 Value::Char(s.chars().next().unwrap())
@@ -122,28 +139,54 @@ impl Interpreter {
                         "Type mismatch: expected char (single character), got string of length {}",
                         s.chars().count()
                     ),
+                    file_path: String::new(),
                     line: value.line,
                     column: value.column,
                 });
             }
 
-            // maybe — auto-wrap non-maybe values
-            (t, Value::Maybe(inner)) if t.starts_with("maybe") => Value::Maybe(inner),
-            (t, v) if t.starts_with("maybe") => Value::Maybe(Some(Box::new(v))),
+            // option
+            (t, Value::Option(inner)) if t.starts_with("option") => Value::Option(inner),
+            (t, Value::Void) if t.starts_with("option") => Value::Option(None),
+            (t, v) if t.starts_with("option") => Value::Option(Some(Box::new(v))),
+            (t, Value::Void) if t.starts_with("option") => Value::Option(None),
+            (t, v) if t.starts_with("option") => {
+                eprintln!("DEBUG option coercion: type={}, val={:?}", t, v);
+                Value::Option(Some(Box::new(v)))
+            }
 
-            // worry — error case handled above via __raise__, success just passes value through
+            // worry
             (t, v) if t.starts_with("worry") => v,
 
             // list
             (t, Value::List(items)) if t.starts_with("list") => Value::List(items),
-            (t, Value::Maybe(None)) if t.starts_with("list") => Value::List(Vec::new()),
+            (t, Value::Option(None)) if t.starts_with("list") => Value::List(Vec::new()),
 
             // table
             (t, Value::Table(pairs)) if t.starts_with("table") => Value::Table(pairs),
-            (t, Value::Maybe(None)) if t.starts_with("table") => Value::Table(Vec::new()),
+            (t, Value::Option(None)) if t.starts_with("table") => Value::Table(Vec::new()),
 
-            // struct — type_name is the struct name e.g. "Point"
+            // struct
             (t, Value::Struct { name, fields }) if t == name => Value::Struct { name, fields },
+
+            // enum variant — type_name is the enum name
+            (t, Value::EnumVariant { enum_name, variant }) if t == enum_name => {
+                Value::EnumVariant { enum_name, variant }
+            }
+
+            // enum variant with data
+            (
+                t,
+                Value::EnumVariantData {
+                    enum_name,
+                    variant,
+                    data,
+                },
+            ) if t == enum_name => Value::EnumVariantData {
+                enum_name,
+                variant,
+                data,
+            },
 
             (expected, actual) => {
                 return Err(RuntimeError {
@@ -152,6 +195,7 @@ impl Interpreter {
                         expected,
                         actual.type_name()
                     ),
+                    file_path: String::new(),
                     line: value.line,
                     column: value.column,
                 });
@@ -165,11 +209,14 @@ impl Interpreter {
             length: name.len(),
         };
 
+        // Track var info for unused variable warnings
+        // Mutable variables are tracked the same way
         self.var_info.insert(
             name.to_string(),
             VarInfo {
                 name: name.to_string(),
                 span,
+                mutable,
             },
         );
 

@@ -8,7 +8,7 @@ fn hint_for_unexpected_char(ch: char) -> String {
         '@' => "'@' isn't used in Luma. Maybe a typo?".to_string(),
         '$' => "'$' isn't used in Luma. Variables don't need a prefix — just use the name directly.".to_string(),
         '!' => "Luma uses 'not' for boolean negation: 'not done' instead of '!done'. '!=' works for not-equal.".to_string(),
-        '?' => "'?' isn't used in Luma. For optional values, 'maybe()' is coming soon.".to_string(),
+        '?' => "'?' isn't used in Luma. For optional values, use 'option(T)'.".to_string(),
         '\\' => "Luma strings don't use backslash escapes. Use '&{var}' for interpolation.".to_string(),
         '/' => "Luma uses '#' for comments, not '//'. Try: # this is a comment".to_string(),
         '&' => "Luma uses 'and' instead of '&&': 'if x > 0 and y > 0 {'".to_string(),

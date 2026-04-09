@@ -13,6 +13,7 @@ pub fn eval_int(
             Ok(n) => Ok(Value::Integer(n)),
             Err(_) => Err(RuntimeError {
                 message: format!("Cannot convert '{}' to integer", s),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -22,6 +23,7 @@ pub fn eval_int(
         Value::Boolean(b) => Ok(Value::Integer(if b { 1 } else { 0 })),
         _ => Err(RuntimeError {
             message: format!("Cannot convert {:?} to integer", arg_val),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -40,6 +42,7 @@ pub fn eval_float(
             Ok(f) => Ok(Value::Float(f)),
             Err(_) => Err(RuntimeError {
                 message: format!("Cannot convert '{}' to float", s),
+                file_path: String::new(),
                 line,
                 column,
             }),
@@ -49,6 +52,7 @@ pub fn eval_float(
         Value::Boolean(b) => Ok(Value::Float(if b { 1.0 } else { 0.0 })),
         _ => Err(RuntimeError {
             message: format!("Cannot convert {:?} to float", arg_val),
+            file_path: String::new(),
             line,
             column,
         }),
@@ -73,6 +77,7 @@ pub fn eval_random(
     if args.len() != 2 {
         return Err(RuntimeError {
             message: "random() takes exactly two arguments (min, max)".to_string(),
+            file_path: String::new(),
             line,
             column,
         });
@@ -86,6 +91,7 @@ pub fn eval_random(
             if min >= max {
                 return Err(RuntimeError {
                     message: "random(): min must be less than max".to_string(),
+                    file_path: String::new(),
                     line,
                     column,
                 });
@@ -97,6 +103,7 @@ pub fn eval_random(
         }
         _ => Err(RuntimeError {
             message: "random() arguments must be integers".to_string(),
+            file_path: String::new(),
             line,
             column,
         }),

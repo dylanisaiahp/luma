@@ -9,7 +9,7 @@ pub enum Value {
     Char(char),
     Boolean(bool),
     Void,
-    Maybe(Option<Box<Value>>),
+    Option(Option<Box<Value>>),
     List(Vec<Value>),
     Table(Vec<(Value, Value)>),
     FetchHandle(String),
@@ -19,13 +19,42 @@ pub enum Value {
         name: String,
         fields: HashMap<String, Value>,
     },
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+    },
+    EnumVariantData {
+        enum_name: String,
+        variant: String,
+        data: Vec<Value>,
+    },
 }
 
 #[derive(Debug)]
 pub struct RuntimeError {
     pub message: String,
+    pub file_path: String,
     pub line: usize,
     pub column: usize,
+}
+
+impl RuntimeError {
+    #[allow(dead_code)]
+    pub fn new(message: String, line: usize, column: usize) -> Self {
+        Self {
+            message,
+            file_path: String::new(),
+            line,
+            column,
+        }
+    }
+
+    pub fn with_file(mut self, file_path: &str) -> Self {
+        if self.file_path.is_empty() {
+            self.file_path = file_path.to_string();
+        }
+        self
+    }
 }
 
 impl Value {
@@ -37,13 +66,15 @@ impl Value {
             Value::Char(_) => "char",
             Value::Boolean(_) => "bool",
             Value::Void => "void",
-            Value::Maybe(_) => "maybe",
+            Value::Option(_) => "option",
             Value::List(_) => "list",
             Value::Table(_) => "table",
             Value::FetchHandle(_) => "fetch",
             Value::InputHandle => "input",
             Value::FileHandle(_) => "file",
             Value::Struct { .. } => "struct",
+            Value::EnumVariant { .. } => "enum",
+            Value::EnumVariantData { .. } => "enum",
         }
     }
 }

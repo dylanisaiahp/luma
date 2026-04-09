@@ -17,6 +17,7 @@ pub fn int_method(
             Some(Value::Integer(exp)) if *exp >= 0 => Ok(Value::Integer(n.pow(*exp as u32))),
             _ => Err(RuntimeError {
                 message: "int.pow() takes one non-negative integer argument".to_string(),
+                file_path: String::new(),
                 line,
                 column,
             }),

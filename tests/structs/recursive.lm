@@ -1,0 +1,22 @@
+struct Point {
+    int x;
+    int y;
+}
+
+struct Rect {
+    Point origin;
+    Point size;
+}
+
+void main() {
+    Point origin = Point(x: 0, y: 0);
+    Point size = Point(x: 10, y: 20);
+    
+    Rect r = Rect(origin: origin, size: size);
+    print(r.origin.x);
+    print(r.size.y);
+    
+    list(Point) points = (origin, size);
+    print(points.len());
+    print(points.get(0).x);
+}
