@@ -1,0 +1,5 @@
+void main() {
+    string raw = "method = \"initialize\"\nid = 1";
+    table(string, string) data = toml(raw).parse();
+    print(data.get("method"));
+}

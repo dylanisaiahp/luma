@@ -699,6 +699,7 @@ impl Codegen {
                         format!("{{ luma_write(&{}); Value::Void }}", arg_exprs.join(", "))
                     }
                     "read" => "luma_read()".to_string(),
+                    "read_n" => format!("luma_read_n(&{})", arg_exprs[0]),
                     "random" => {
                         format!("luma_random(&{}, &{})", arg_exprs[0], arg_exprs[1])
                     }
@@ -720,6 +721,22 @@ impl Codegen {
                                 .to_string()
                         } else {
                             arg_exprs[0].clone()
+                        }
+                    }
+                    "json" => {
+                        if arg_exprs.is_empty() {
+                            "luma_runtime::runtime_error(\"json() requires exactly one argument\")"
+                                .to_string()
+                        } else {
+                            format!("luma_json(&{})", arg_exprs[0])
+                        }
+                    }
+                    "toml" => {
+                        if arg_exprs.is_empty() {
+                            "luma_runtime::runtime_error(\"toml() requires exactly one argument\")"
+                                .to_string()
+                        } else {
+                            format!("luma_toml(&{})", arg_exprs[0])
                         }
                     }
                     "run" => {
@@ -792,6 +809,18 @@ impl Codegen {
                     }
                     ExprKind::Call { name, .. } if name == "input" => {
                         format!("luma_input_method(\"{}\")", method)
+                    }
+                    ExprKind::Call { name, .. } if name == "json" => {
+                        format!(
+                            "{{ let _obj = {}; let _s = if let Value::JsonHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error(\"json() method called on non-json\") }}; luma_json_method(&_s, \"{}\", {}) }}",
+                            obj, method, args_slice
+                        )
+                    }
+                    ExprKind::Call { name, .. } if name == "toml" => {
+                        format!(
+                            "{{ let _obj = {}; let _s = if let Value::TomlHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error(\"toml() method called on non-toml\") }}; luma_toml_method(&_s, \"{}\", {}) }}",
+                            obj, method, args_slice
+                        )
                     }
                     _ => {
                         let args_vec = if arg_exprs.is_empty() {

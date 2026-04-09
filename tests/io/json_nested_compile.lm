@@ -1,0 +1,6 @@
+void main() {
+    string raw = "{\"params\": {\"textDocument\": {\"uri\": \"test.slt\", \"text\": \"void main(){}\"}}}";
+    table(string, string) data = json(raw).parse();
+    print(data.get("params.textDocument.uri"));
+    print(data.get("params.textDocument.text"));
+}

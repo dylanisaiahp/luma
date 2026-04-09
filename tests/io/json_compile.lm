@@ -1,0 +1,5 @@
+void main() {
+    string raw = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}";
+    table(string, string) data = json(raw).parse();
+    print(data.get("method"));
+}
