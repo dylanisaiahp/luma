@@ -1,6 +1,6 @@
 // src/interpreter/builtins/io.rs
 use crate::interpreter::value::{RuntimeError, Value};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 pub fn eval_read(
     args: &[crate::ast::Expr],
@@ -34,6 +34,68 @@ pub fn eval_read(
         })?;
 
     Ok(Value::String(input.trim().to_string()))
+}
+
+pub fn eval_read_n(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "read_n() takes exactly one argument (number of bytes)".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
+    }
+
+    let n_val = interpreter.evaluate_expression(&args[0])?;
+    let n = match n_val {
+        Value::Integer(n) => n as usize,
+        _ => {
+            return Err(RuntimeError {
+                message: "read_n() argument must be an integer".to_string(),
+                file_path: String::new(),
+                line,
+                column,
+            });
+        }
+    };
+
+    io::stdout().flush().map_err(|e| RuntimeError {
+        message: format!("Failed to flush stdout: {}", e),
+        file_path: String::new(),
+        line,
+        column,
+    })?;
+
+    if n == 0 {
+        return Ok(Value::String(String::new()));
+    }
+
+    let mut buffer = vec![0u8; n];
+    let mut stdin = io::stdin();
+    let mut total_read = 0;
+
+    while total_read < n {
+        match stdin.read(&mut buffer[total_read..]) {
+            Ok(0) => break, // EOF
+            Ok(bytes) => total_read += bytes,
+            Err(e) => {
+                return Err(RuntimeError {
+                    message: format!("Failed to read input: {}", e),
+                    file_path: String::new(),
+                    line,
+                    column,
+                });
+            }
+        }
+    }
+
+    buffer.truncate(total_read);
+    Ok(Value::String(String::from_utf8_lossy(&buffer).to_string()))
 }
 
 pub fn eval_write(
@@ -149,6 +211,162 @@ pub fn eval_file(
             line,
             column,
         }),
+    }
+}
+
+pub fn eval_json(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "json() takes exactly one argument".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
+    }
+    let val = interpreter.evaluate_expression(&args[0])?;
+    match val {
+        Value::String(s) => Ok(Value::JsonHandle(s)),
+        Value::Table(pairs) => {
+            let json_str =
+                serde_json::to_string_pretty(&table_to_json(&pairs)).map_err(|e| RuntimeError {
+                    message: format!("json() failed to encode table: {}", e),
+                    file_path: String::new(),
+                    line,
+                    column,
+                })?;
+            Ok(Value::String(json_str))
+        }
+        _ => Err(RuntimeError {
+            message: "json() argument must be a string or table".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        }),
+    }
+}
+
+fn table_to_json(table: &[(Value, Value)]) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (k, v) in table {
+        if let Value::String(key) = k {
+            map.insert(key.clone(), value_to_json_value(v));
+        }
+    }
+    serde_json::Value::Object(map)
+}
+
+fn value_to_json_value(value: &Value) -> serde_json::Value {
+    match value {
+        Value::Integer(n) => serde_json::Value::Number(serde_json::Number::from(*n)),
+        Value::Float(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        Value::String(s) => serde_json::Value::String(s.clone()),
+        Value::Char(c) => serde_json::Value::String(c.to_string()),
+        Value::Boolean(b) => serde_json::Value::Bool(*b),
+        Value::Void => serde_json::Value::Null,
+        Value::Option(None) => serde_json::Value::Null,
+        Value::Option(Some(v)) => value_to_json_value(v),
+        Value::List(arr) => serde_json::Value::Array(arr.iter().map(value_to_json_value).collect()),
+        Value::Table(pairs) => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in pairs {
+                if let Value::String(key) = k {
+                    map.insert(key.clone(), value_to_json_value(v));
+                }
+            }
+            serde_json::Value::Object(map)
+        }
+        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
+            serde_json::Value::String("<handle>".to_string())
+        }
+        Value::JsonHandle(_) | Value::TomlHandle(_) => {
+            serde_json::Value::String("<handle>".to_string())
+        }
+        Value::Struct { .. } => serde_json::Value::String("<struct>".to_string()),
+        Value::EnumVariant { .. } => serde_json::Value::String("<enum>".to_string()),
+        Value::EnumVariantData { .. } => serde_json::Value::String("<enum>".to_string()),
+    }
+}
+
+pub fn eval_toml(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "toml() takes exactly one argument".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
+    }
+    let val = interpreter.evaluate_expression(&args[0])?;
+    match val {
+        Value::String(s) => Ok(Value::TomlHandle(s)),
+        Value::Table(pairs) => {
+            let toml_str =
+                toml::to_string_pretty(&table_to_toml(&pairs)).map_err(|e| RuntimeError {
+                    message: format!("toml() failed to encode table: {}", e),
+                    file_path: String::new(),
+                    line,
+                    column,
+                })?;
+            Ok(Value::String(toml_str))
+        }
+        _ => Err(RuntimeError {
+            message: "toml() argument must be a string or table".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        }),
+    }
+}
+
+fn table_to_toml(table: &[(Value, Value)]) -> toml::Value {
+    let mut map = toml::map::Map::new();
+    for (k, v) in table {
+        if let Value::String(key) = k {
+            map.insert(key.clone(), value_to_toml_value(v));
+        }
+    }
+    toml::Value::Table(map)
+}
+
+fn value_to_toml_value(value: &Value) -> toml::Value {
+    match value {
+        Value::Integer(n) => toml::Value::Integer(*n),
+        Value::Float(f) => toml::Value::Float(*f),
+        Value::String(s) => toml::Value::String(s.clone()),
+        Value::Char(c) => toml::Value::String(c.to_string()),
+        Value::Boolean(b) => toml::Value::Boolean(*b),
+        Value::Void => toml::Value::String("void".to_string()),
+        Value::Option(None) => toml::Value::String("null".to_string()),
+        Value::Option(Some(v)) => value_to_toml_value(v),
+        Value::List(arr) => toml::Value::Array(arr.iter().map(value_to_toml_value).collect()),
+        Value::Table(pairs) => {
+            let mut map = toml::map::Map::new();
+            for (k, v) in pairs {
+                if let Value::String(key) = k {
+                    map.insert(key.clone(), value_to_toml_value(v));
+                }
+            }
+            toml::Value::Table(map)
+        }
+        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
+            toml::Value::String("<handle>".to_string())
+        }
+        Value::JsonHandle(_) | Value::TomlHandle(_) => toml::Value::String("<handle>".to_string()),
+        Value::Struct { .. } => toml::Value::String("<struct>".to_string()),
+        Value::EnumVariant { .. } => toml::Value::String("<enum>".to_string()),
+        Value::EnumVariantData { .. } => toml::Value::String("<enum>".to_string()),
     }
 }
 

@@ -1,0 +1,17 @@
+void main() {
+    # Test JSON parsing
+    string json_str = '{"name": "Luma", "version": "1.0", "features": ["fast", "simple"], "config": {"debug": true}}';
+    table(string, string) data = json(json_str).parse();
+    
+    print(data.get("name"));
+    print(data.get("version"));
+    print(data.get("features"));
+    print(data.get("config.debug"));
+    
+    # Test JSON encoding - pass table directly to json() to encode
+    table(string, string) new_data = ("title": "Test Project", "count": "42", "active": "true");
+    string encoded = json(new_data);
+    print(encoded);
+    
+    print("JSON tests passed!");
+}

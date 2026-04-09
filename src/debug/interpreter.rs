@@ -93,6 +93,8 @@ fn format_value(val: &Value) -> String {
         Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
         Value::InputHandle => "input()".to_string(),
         Value::FileHandle(path) => format!("file(\"{}\")", path),
+        Value::JsonHandle(s) => format!("json(\"{}\")", s),
+        Value::TomlHandle(s) => format!("toml(\"{}\")", s),
         Value::Struct { name, fields } => format!("{}({} fields)", name, fields.len()),
         Value::EnumVariant { enum_name, variant } => format!("{}::{}", enum_name, variant),
         Value::EnumVariantData {

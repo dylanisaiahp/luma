@@ -1,0 +1,14 @@
+void main() {
+    # Test read_n(n) - read exactly N bytes from stdin
+    
+    # Read first 5 bytes
+    print(read_n(5));
+    
+    # Read next 10 bytes (should read " World!" = 7 bytes since "Hello, " was consumed)
+    # Actually input is "Hello, World!\n" = 14 chars, after 5 bytes consumed = 9 remaining
+    # Let's read 20 bytes to see what happens when we exceed
+    string rest = read_n(20);
+    print(rest);
+    
+    print("done");
+}

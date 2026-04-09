@@ -55,6 +55,8 @@ impl Interpreter {
             Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
             Value::InputHandle => "input()".to_string(),
             Value::FileHandle(path) => format!("file(\"{}\")", path),
+            Value::JsonHandle(s) => format!("json(\"{}\")", s),
+            Value::TomlHandle(s) => format!("toml(\"{}\")", s),
             Value::Struct { name, fields } => {
                 let mut pairs: Vec<(&String, &Value)> = fields.iter().collect();
                 pairs.sort_by_key(|(k, _)| k.as_str());

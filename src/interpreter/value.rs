@@ -15,6 +15,8 @@ pub enum Value {
     FetchHandle(String),
     InputHandle,
     FileHandle(String),
+    JsonHandle(String),
+    TomlHandle(String),
     Struct {
         name: String,
         fields: HashMap<String, Value>,
@@ -72,6 +74,8 @@ impl Value {
             Value::FetchHandle(_) => "fetch",
             Value::InputHandle => "input",
             Value::FileHandle(_) => "file",
+            Value::JsonHandle(_) => "json",
+            Value::TomlHandle(_) => "toml",
             Value::Struct { .. } => "struct",
             Value::EnumVariant { .. } => "enum",
             Value::EnumVariantData { .. } => "enum",

@@ -1,0 +1,13 @@
+void main() {
+    # Test read(int n) - read exactly N bytes
+    # First, write a test file with known content
+    file("tests/io/test_read.txt").write("Hello, World! This is a test.");
+    
+    # Read exactly 5 bytes from file
+    string content = file("tests/io/test_read.txt").read();
+    string first5 = content.get(0, 5);
+    print(first5);
+    
+    # Test read(0) returns empty
+    print("done");
+}

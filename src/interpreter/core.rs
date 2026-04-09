@@ -318,6 +318,8 @@ impl Interpreter {
             Value::FetchHandle(url) => format!("fetch:{}", url),
             Value::InputHandle => "input:".to_string(),
             Value::FileHandle(path) => format!("file:{}", path),
+            Value::JsonHandle(s) => format!("json:{}", s),
+            Value::TomlHandle(s) => format!("toml:{}", s),
             Value::EnumVariant { enum_name, variant } => {
                 format!("enum:{}.{}", enum_name, variant)
             }
@@ -391,6 +393,10 @@ impl Interpreter {
             } else {
                 Value::Void
             }
+        } else if let Some(rest) = encoded.strip_prefix("json:") {
+            Value::JsonHandle(rest.to_string())
+        } else if let Some(rest) = encoded.strip_prefix("toml:") {
+            Value::TomlHandle(rest.to_string())
         } else {
             Value::Void
         }
