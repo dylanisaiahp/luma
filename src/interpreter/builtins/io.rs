@@ -114,7 +114,12 @@ pub fn eval_write(
     }
     let val = interpreter.evaluate_expression(&args[0])?;
     let s = interpreter.value_to_display_string(&val);
-    print!("{}", s);
+    let unescaped = s
+        .replace("\\r\\n", "\r\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t");
+    print!("{}", unescaped);
     io::stdout().flush().map_err(|e| RuntimeError {
         message: format!("Failed to flush stdout: {}", e),
         file_path: String::new(),

@@ -1,0 +1,4 @@
+void main() {
+    write("Hello\nWorld\r\n");
+    write("Tab:\there\r\nDone");
+}

@@ -365,27 +365,29 @@ fn json_to_table(value: serde_json::Value) -> Vec<(Value, Value)> {
 
 fn flatten_json(prefix: &str, value: serde_json::Value, result: &mut Vec<(Value, Value)>) {
     match value {
-        serde_json::Value::Null => {}
+        serde_json::Value::Null => {
+            result.push((
+                Value::String(prefix.to_string()),
+                Value::String("null".to_string()),
+            ));
+        }
         serde_json::Value::Bool(b) => {
-            result.push((Value::String(prefix.to_string()), Value::Boolean(b)));
+            result.push((
+                Value::String(prefix.to_string()),
+                Value::String(b.to_string()),
+            ));
         }
         serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                result.push((Value::String(prefix.to_string()), Value::Integer(i)));
-            } else if let Some(f) = n.as_f64() {
-                result.push((Value::String(prefix.to_string()), Value::Float(f)));
-            } else {
-                result.push((
-                    Value::String(prefix.to_string()),
-                    Value::String(n.to_string()),
-                ));
-            }
+            result.push((
+                Value::String(prefix.to_string()),
+                Value::String(n.to_string()),
+            ));
         }
         serde_json::Value::String(s) => {
             result.push((Value::String(prefix.to_string()), Value::String(s)));
         }
         serde_json::Value::Array(arr) => {
-            let list: Vec<Value> = arr.into_iter().map(json_value_to_value).collect();
+            let list: Vec<Value> = arr.into_iter().map(json_value_to_string).collect();
             result.push((Value::String(prefix.to_string()), Value::List(list)));
         }
         serde_json::Value::Object(obj) => {
@@ -401,27 +403,19 @@ fn flatten_json(prefix: &str, value: serde_json::Value, result: &mut Vec<(Value,
     }
 }
 
-fn json_value_to_value(value: serde_json::Value) -> Value {
+fn json_value_to_string(value: serde_json::Value) -> Value {
     match value {
-        serde_json::Value::Null => Value::Option(None),
-        serde_json::Value::Bool(b) => Value::Boolean(b),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Value::Integer(i)
-            } else if let Some(f) = n.as_f64() {
-                Value::Float(f)
-            } else {
-                Value::String(n.to_string())
-            }
-        }
+        serde_json::Value::Null => Value::String("null".to_string()),
+        serde_json::Value::Bool(b) => Value::String(b.to_string()),
+        serde_json::Value::Number(n) => Value::String(n.to_string()),
         serde_json::Value::String(s) => Value::String(s),
         serde_json::Value::Array(arr) => {
-            Value::List(arr.into_iter().map(json_value_to_value).collect())
+            Value::List(arr.into_iter().map(json_value_to_string).collect())
         }
         serde_json::Value::Object(obj) => {
             let table: Vec<(Value, Value)> = obj
                 .into_iter()
-                .map(|(k, v)| (Value::String(k), json_value_to_value(v)))
+                .map(|(k, v)| (Value::String(k), json_value_to_string(v)))
                 .collect();
             Value::Table(table)
         }
