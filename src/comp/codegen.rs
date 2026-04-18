@@ -7,9 +7,11 @@ pub struct Codegen {
     indent: usize,
     var_counter: usize,
     current_return_type: String,
+    current_file: String,
     struct_methods: Vec<(String, String)>,
     emitted_functions: std::collections::HashSet<String>,
     mutated_vars: std::collections::HashSet<String>,
+    expected_type: Option<String>,
 }
 
 impl Default for Codegen {
@@ -25,10 +27,17 @@ impl Codegen {
             indent: 0,
             var_counter: 0,
             current_return_type: "void".to_string(),
+            current_file: String::new(),
             struct_methods: Vec::new(),
             emitted_functions: std::collections::HashSet::new(),
             mutated_vars: std::collections::HashSet::new(),
+            expected_type: None,
         }
+    }
+
+    pub fn with_file(mut self, file: &str) -> Self {
+        self.current_file = file.to_string();
+        self
     }
 
     fn collect_mutated_vars(&mut self, stmts: &[Stmt]) {
@@ -191,17 +200,17 @@ impl Codegen {
         // Emit struct dispatch function
         if !self.struct_methods.is_empty() {
             let methods = self.struct_methods.clone();
-            self.emit_line("fn luma_struct_dispatch(struct_name: &str, fields: std::collections::HashMap<String, Value>, method: &str, args: Vec<Value>) -> Value {");
+            self.emit_line("fn luma_struct_dispatch(struct_name: &str, fields: std::collections::HashMap<String, Value>, method: &str, args: Vec<Value>, file: &str, line: u32, col: u32) -> Value {");
             self.indent += 1;
             self.emit_line("match (struct_name, method) {");
             self.indent += 1;
             for (struct_name, method_name) in &methods {
                 self.emit_line(&format!(
-                    "(\"{}\", \"{}\") => luma_struct_{}_{}(&fields, args),",
+                    "(\"{}\", \"{}\") => luma_struct_{}_{}(&fields, args, file, line, col),",
                     struct_name, method_name, struct_name, method_name
                 ));
             }
-            self.emit_line("_ => luma_runtime::runtime_error(&format!(\"{} has no method '{}'\", struct_name, method))");
+            self.emit_line("_ => luma_runtime::runtime_error_with_location(&format!(\"{} has no method '{}'\", struct_name, method), file, line, col)");
             self.indent -= 1;
             self.emit_line("}");
             self.indent -= 1;
@@ -250,13 +259,23 @@ impl Codegen {
                     return;
                 }
 
+                // Collect mutated vars only from this function's body
+                self.mutated_vars.clear();
+                self.collect_mutated_vars(body);
+
                 if name == "main" {
                     self.current_return_type = "void".to_string();
                     self.emit_line("fn main() {");
                 } else {
                     let params_str = params
                         .iter()
-                        .map(|p| format!("{}: Value", p.name))
+                        .map(|p| {
+                            if self.mutated_vars.contains(&p.name) {
+                                format!("mut {}: Value", p.name)
+                            } else {
+                                format!("{}: Value", p.name)
+                            }
+                        })
                         .collect::<Vec<_>>()
                         .join(", ");
                     let ret = if return_type == "void" {
@@ -288,19 +307,19 @@ impl Codegen {
                         " -> Value".to_string()
                     };
                     self.emit_line(&format!(
-                        "fn luma_struct_{}_{}(fields: &std::collections::HashMap<String, Value>, args: Vec<Value>){} {{",
+                        "fn luma_struct_{}_{}(fields: &std::collections::HashMap<String, Value>, args: Vec<Value>, _file: &str, _line: u32, _col: u32){} {{",
                         name, method.name, ret
                     ));
                     self.indent += 1;
                     for field in fields {
                         self.emit_line(&format!(
-                            "let {} = fields.get(\"{}\").cloned().unwrap_or_else(|| luma_runtime::runtime_error(\"field '{}' not found on {}\"));",
+                            "let {} = fields.get(\"{}\").cloned().unwrap_or_else(|| luma_runtime::runtime_error_with_location(&format!(\"field '{{}}' not found on {{}}\", \"{}\", \"{}\"), _file, _line, _col));",
                             field.name, field.name, field.name, name
                         ));
                     }
                     for (i, param) in method.params.iter().enumerate() {
                         self.emit_line(&format!(
-                            "let {} = args.get({}).cloned().unwrap_or_else(|| luma_runtime::runtime_error(\"missing argument '{}' on {}\"));",
+                            "let {} = args.get({}).cloned().unwrap_or_else(|| luma_runtime::runtime_error_with_location(&format!(\"missing argument '{{}}' on {{}}\", \"{}\", \"{}\"), _file, _line, _col));",
                             param.name, i, param.name, method.name
                         ));
                     }
@@ -324,9 +343,12 @@ impl Codegen {
                 name,
                 value,
                 mutable,
+                type_name,
                 ..
             } => {
+                self.expected_type = Some(type_name.clone());
                 let expr = self.emit_expr(value);
+                self.expected_type = None;
                 let is_mut = *mutable || self.mutated_vars.contains(name);
                 let decl = if is_mut {
                     format!("let mut {} = {};", name, expr)
@@ -442,8 +464,8 @@ impl Codegen {
                 let e = self.emit_expr(end);
                 let tmp_s = self.fresh_var();
                 let tmp_e = self.fresh_var();
-                self.emit_line(&format!("let {} = if let Value::Integer(n) = {} {{ n }} else {{ luma_runtime::runtime_error(\"for range requires integers\") }};", tmp_s, s));
-                self.emit_line(&format!("let {} = if let Value::Integer(n) = {} {{ n }} else {{ luma_runtime::runtime_error(\"for range requires integers\") }};", tmp_e, e));
+                self.emit_line(&format!("let {} = if let Value::Integer(n) = {} {{ n }} else {{ luma_runtime::runtime_error_with_location(\"for range requires integers\", \"{}\", 0, 0) }};", tmp_s, s, self.current_file));
+                self.emit_line(&format!("let {} = if let Value::Integer(n) = {} {{ n }} else {{ luma_runtime::runtime_error_with_location(\"for range requires integers\", \"{}\", 0, 0) }};", tmp_e, e, self.current_file));
                 self.emit_line(&format!("for _luma_i in {}..{} {{", tmp_s, tmp_e));
                 self.indent += 1;
                 self.emit_line(&format!("let mut {} = Value::Integer(_luma_i);", var));
@@ -461,7 +483,7 @@ impl Codegen {
             } => {
                 let iter = self.emit_expr(iterable);
                 let tmp = self.fresh_var();
-                self.emit_line(&format!("let {} = if let Value::List(items) = {} {{ items }} else {{ luma_runtime::runtime_error(\"for..in requires a list\") }};", tmp, iter));
+                self.emit_line(&format!("let {} = if let Value::List(items) = {} {{ items }} else {{ luma_runtime::runtime_error_with_location(\"for..in requires a list\", \"{}\", 0, 0) }};", tmp, iter, self.current_file));
                 self.emit_line(&format!("for _luma_item in {}.into_iter() {{", tmp));
                 self.indent += 1;
                 self.emit_line(&format!("let mut {} = _luma_item;", var));
@@ -480,7 +502,7 @@ impl Codegen {
             } => {
                 let iter = self.emit_expr(iterable);
                 let tmp = self.fresh_var();
-                self.emit_line(&format!("let {} = if let Value::Table(pairs) = {} {{ pairs }} else {{ luma_runtime::runtime_error(\"for..in requires a table\") }};", tmp, iter));
+                self.emit_line(&format!("let {} = if let Value::Table(pairs) = {} {{ pairs }} else {{ luma_runtime::runtime_error_with_location(\"for..in requires a table\", \"{}\", 0, 0) }};", tmp, iter, self.current_file));
                 self.emit_line(&format!("for (_luma_k, _luma_v) in {}.into_iter() {{", tmp));
                 self.indent += 1;
                 self.emit_line(&format!("let mut {} = _luma_k;", key_var));
@@ -527,7 +549,7 @@ impl Codegen {
                 } else {
                     self.emit_line("if !_luma_matched {");
                     self.indent += 1;
-                    self.emit_line("luma_runtime::runtime_error(\"match must be exhaustive\");");
+                    self.emit_line(&format!("luma_runtime::runtime_error_with_location(\"match must be exhaustive\", \"{}\", 0, 0);", self.current_file));
                     self.indent -= 1;
                     self.emit_line("}");
                 }
@@ -538,11 +560,15 @@ impl Codegen {
                 }
             }
 
-            Stmt::Raise { message, .. } => {
+            Stmt::Raise {
+                message,
+                line,
+                column,
+            } => {
                 let msg = self.emit_expr(message);
                 self.emit_line(&format!(
-                    "luma_runtime::runtime_error(&format!(\"{{}}\", {}));",
-                    msg
+                    "luma_runtime::runtime_error_with_location(&format!(\"{{}}\", {}), \"{}\", {}, {});",
+                    msg, self.current_file, line, column
                 ));
             }
 
@@ -604,7 +630,11 @@ impl Codegen {
             ExprKind::Integer(n) => format!("Value::Integer({})", n),
             ExprKind::Float(f) => format!("Value::Float({}f64)", f),
             ExprKind::Boolean(b) => format!("Value::Boolean({})", b),
-            ExprKind::Empty => "Value::Option(None)".to_string(),
+            ExprKind::Empty => match self.expected_type.as_deref() {
+                Some(t) if t.starts_with("table") => "Value::Table(vec![])".to_string(),
+                Some(t) if t.starts_with("list") => "Value::List(vec![])".to_string(),
+                _ => "Value::List(vec![])".to_string(),
+            },
             ExprKind::Some(inner) => {
                 let inner_code = self.emit_expr(inner);
                 format!("Value::Option(Some(Box::new({})))", inner_code)
@@ -638,8 +668,8 @@ impl Codegen {
                 let _tmp = self.fresh_var();
                 // emit as inline block
                 format!(
-                    "{{ let _not_val = {}; if let Value::Boolean(b) = _not_val {{ Value::Boolean(!b) }} else {{ luma_runtime::runtime_error(\"'not' requires a boolean\") }} }}",
-                    e
+                    "{{ let _not_val = {}; if let Value::Boolean(b) = _not_val {{ Value::Boolean(!b) }} else {{ luma_runtime::runtime_error_with_location(\"'not' requires a boolean\", \"{}\", 0, 0) }} }}",
+                    e, self.current_file
                 )
             }
 
@@ -659,18 +689,19 @@ impl Codegen {
                     BinaryOp::GreaterEqual => format!("luma_compare(&{}, &{}, \">=\")", l, r),
                     BinaryOp::LessEqual => format!("luma_compare(&{}, &{}, \"<=\")", l, r),
                     BinaryOp::And => format!(
-                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error(\"'and' requires booleans\") }} }}",
-                        l, r
+                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }} }}",
+                        l, r, self.current_file
                     ),
                     BinaryOp::Or => format!(
-                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error(\"'or' requires booleans\") }} }}",
-                        l, r
+                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }} }}",
+                        l, r, self.current_file
                     ),
                 }
             }
 
             ExprKind::Assign { name, value } => {
                 let v = self.emit_expr(value);
+                self.mutated_vars.insert(name.clone());
                 format!("{{ {} = {}; {}.clone() }}", name, v, name)
             }
 
@@ -682,6 +713,7 @@ impl Codegen {
                     crate::ast::AssignOpKind::Multiply => "luma_multiply",
                     crate::ast::AssignOpKind::Divide => "luma_divide",
                 };
+                self.mutated_vars.insert(name.clone());
                 format!(
                     "{{ {} = {}({}.clone(), {}); {}.clone() }}",
                     name, op_fn, name, v, name
@@ -709,32 +741,40 @@ impl Codegen {
                     "input" => "Value::Void".to_string(), // handle via method
                     "fetch" => {
                         if arg_exprs.is_empty() {
-                            "luma_runtime::runtime_error(\"fetch() requires exactly one argument\")"
-                                .to_string()
+                            format!(
+                                "luma_runtime::runtime_error_with_location(\"fetch() requires exactly one argument\", \"{}\", 0, 0)",
+                                self.current_file
+                            )
                         } else {
                             format!("Value::String({})", arg_exprs[0])
                         }
                     }
                     "file" => {
                         if arg_exprs.is_empty() {
-                            "luma_runtime::runtime_error(\"file() requires exactly one argument\")"
-                                .to_string()
+                            format!(
+                                "luma_runtime::runtime_error_with_location(\"file() requires exactly one argument\", \"{}\", 0, 0)",
+                                self.current_file
+                            )
                         } else {
                             arg_exprs[0].clone()
                         }
                     }
                     "json" => {
                         if arg_exprs.is_empty() {
-                            "luma_runtime::runtime_error(\"json() requires exactly one argument\")"
-                                .to_string()
+                            format!(
+                                "luma_runtime::runtime_error_with_location(\"json() requires exactly one argument\", \"{}\", 0, 0)",
+                                self.current_file
+                            )
                         } else {
                             format!("luma_json(&{})", arg_exprs[0])
                         }
                     }
                     "toml" => {
                         if arg_exprs.is_empty() {
-                            "luma_runtime::runtime_error(\"toml() requires exactly one argument\")"
-                                .to_string()
+                            format!(
+                                "luma_runtime::runtime_error_with_location(\"toml() requires exactly one argument\", \"{}\", 0, 0)",
+                                self.current_file
+                            )
                         } else {
                             format!("luma_toml(&{})", arg_exprs[0])
                         }
@@ -771,39 +811,42 @@ impl Codegen {
                 match &object.kind {
                     ExprKind::Call { name, .. } if name == "file" => {
                         if args.is_empty() {
-                            let path_expr = "luma_runtime::runtime_error(\"file() requires exactly one argument\")";
+                            let path_expr = format!(
+                                "luma_runtime::runtime_error_with_location(\"file() requires exactly one argument\", \"{}\", 0, 0)",
+                                self.current_file
+                            );
                             let path_str = format!(
-                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires a string path\") }}",
-                                path_expr
+                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error_with_location(\"file() requires a string path\", \"{}\", 0, 0) }}",
+                                path_expr, self.current_file
                             );
                             let _ = path_str; // suppress warning
                             format!(
-                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires string\") }}; luma_file_method(&_path, \"{}\", {}) }}",
-                                obj, method, args_slice
+                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error_with_location(\"file() requires string\", \"{}\", 0, 0) }}; luma_file_method(&_path, \"{}\", {}) }}",
+                                obj, self.current_file, method, args_slice
                             )
                         } else {
                             let path_expr = self.emit_expr(&args[0]);
                             let path_str = format!(
-                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires a string path\") }}",
-                                path_expr
+                                "if let Value::String(ref _p) = {} {{ _p.clone() }} else {{ luma_runtime::runtime_error_with_location(\"file() requires a string path\", \"{}\", 0, 0) }}",
+                                path_expr, self.current_file
                             );
                             let _ = path_str; // suppress warning
                             format!(
-                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error(\"file() requires string\") }}; luma_file_method(&_path, \"{}\", {}) }}",
-                                obj, method, args_slice
+                                "{{ let _obj = {}; let _path = if let Value::String(ref p) = _obj {{ p.clone() }} else {{ luma_runtime::runtime_error_with_location(\"file() requires string\", \"{}\", 0, 0) }}; luma_file_method(&_path, \"{}\", {}) }}",
+                                obj, self.current_file, method, args_slice
                             )
                         }
                     }
                     ExprKind::Call { name, .. } if name == "fetch" => {
                         if args.is_empty() {
                             format!(
-                                "{{ let _obj = {}; let _url = luma_runtime::runtime_error(\"fetch() requires exactly one argument\"); luma_fetch_method(&_url, \"{}\", {}) }}",
-                                obj, method, args_slice
+                                "{{ let _obj = {}; let _url = luma_runtime::runtime_error_with_location(\"fetch() requires exactly one argument\", \"{}\", 0, 0); luma_fetch_method(&_url, \"{}\", {}) }}",
+                                obj, self.current_file, method, args_slice
                             )
                         } else {
                             format!(
-                                "{{ let _obj = {}; let _url = if let Value::String(ref u) = _obj {{ u.clone() }} else {{ luma_runtime::runtime_error(\"fetch() requires string\") }}; luma_fetch_method(&_url, \"{}\", {}) }}",
-                                obj, method, args_slice
+                                "{{ let _obj = {}; let _url = if let Value::String(ref u) = _obj {{ u.clone() }} else {{ luma_runtime::runtime_error_with_location(\"fetch() requires string\", \"{}\", 0, 0) }}; luma_fetch_method(&_url, \"{}\", {}) }}",
+                                obj, self.current_file, method, args_slice
                             )
                         }
                     }
@@ -812,14 +855,14 @@ impl Codegen {
                     }
                     ExprKind::Call { name, .. } if name == "json" => {
                         format!(
-                            "{{ let _obj = {}; let _s = if let Value::JsonHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error(\"json() method called on non-json\") }}; luma_json_method(&_s, \"{}\", {}) }}",
-                            obj, method, args_slice
+                            "{{ let _obj = {}; let _s = if let Value::JsonHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error_with_location(\"json() method called on non-json\", \"{}\", 0, 0) }}; luma_json_method(&_s, \"{}\", {}) }}",
+                            obj, self.current_file, method, args_slice
                         )
                     }
                     ExprKind::Call { name, .. } if name == "toml" => {
                         format!(
-                            "{{ let _obj = {}; let _s = if let Value::TomlHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error(\"toml() method called on non-toml\") }}; luma_toml_method(&_s, \"{}\", {}) }}",
-                            obj, method, args_slice
+                            "{{ let _obj = {}; let _s = if let Value::TomlHandle(ref s) = _obj {{ s.clone() }} else {{ luma_runtime::runtime_error_with_location(\"toml() method called on non-toml\", \"{}\", 0, 0) }}; luma_toml_method(&_s, \"{}\", {}) }}",
+                            obj, self.current_file, method, args_slice
                         )
                     }
                     _ => {
@@ -829,11 +872,27 @@ impl Codegen {
                             format!("vec![{}]", arg_exprs.join(", "))
                         };
                         if self.struct_methods.is_empty() {
-                            format!("luma_method({}, \"{}\", {})", obj, method, args_vec)
+                            format!(
+                                "luma_method_with_location({}, \"{}\", {}, \"{}\", {}, {})",
+                                obj,
+                                method,
+                                args_vec,
+                                self.current_file,
+                                object.line,
+                                object.column
+                            )
                         } else {
                             format!(
-                                "{{ let _obj = {}; let _method = \"{}\"; let _args = {}; if let Value::Struct {{ ref name, ref fields }} = _obj {{ luma_struct_dispatch(name, fields.clone(), _method, _args) }} else {{ luma_method(_obj, _method, _args) }} }}",
-                                obj, method, args_vec
+                                "{{ let _obj = {}; let _method = \"{}\"; let _args = {}; if let Value::Struct {{ ref name, ref fields }} = _obj {{ luma_struct_dispatch(name, fields.clone(), _method, _args, \"{}\", {}, {}) }} else {{ luma_method_with_location(_obj, _method, _args, \"{}\", {}, {}) }}",
+                                obj,
+                                method,
+                                args_vec,
+                                self.current_file,
+                                object.line,
+                                object.column,
+                                self.current_file,
+                                object.line,
+                                object.column
                             )
                         }
                     }
@@ -843,8 +902,16 @@ impl Codegen {
             ExprKind::FieldAccess { object, field } => {
                 let obj = self.emit_expr(object);
                 format!(
-                    "{{ let _obj = {}; if let Value::Struct {{ ref fields, .. }} = _obj {{ fields.get(\"{}\").cloned().unwrap_or_else(|| luma_runtime::runtime_error(\"field '{}' not found\")) }} else {{ luma_runtime::runtime_error(\"field access on non-struct\") }} }}",
-                    obj, field, field
+                    "{{ let _obj = {}; if let Value::Struct {{ name: ref _struct_name, fields }} = _obj {{ fields.get(\"{}\").cloned().unwrap_or_else(|| luma_runtime::runtime_error_with_location(&format!(\"field '{{}}' not found on struct '{{}}'\", \"{}\", _struct_name), \"{}\", {}, {})) }} else {{ luma_runtime::runtime_error_with_location(\"field access on non-struct\", \"{}\", {}, {}) }} }}",
+                    obj,
+                    field,
+                    field,
+                    self.current_file,
+                    object.line,
+                    object.column,
+                    self.current_file,
+                    object.line,
+                    object.column
                 )
             }
 
@@ -906,8 +973,8 @@ impl Codegen {
                 ("float", "max") => "Value::Float(f64::MAX)".to_string(),
                 ("float", "min") => "Value::Float(f64::MIN)".to_string(),
                 _ => format!(
-                    "luma_runtime::runtime_error(\"unknown constant {}.{}\")",
-                    type_name, constant
+                    "luma_runtime::runtime_error_with_location(&format!(\"unknown constant {}.{}\", \"{}\", \"{}\"), \"{}\", 0, 0)",
+                    type_name, constant, type_name, constant, self.current_file
                 ),
             },
         }

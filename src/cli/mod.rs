@@ -799,6 +799,7 @@ fn build_file(file: &str, name: &str) -> anyhow::Result<()> {
     let options = super::comp::CompileOptions {
         output_name: name.to_string(),
         output_dir: "builds".to_string(),
+        source_file: Some(file.to_string()),
     };
 
     super::comp::compile(statements, options)

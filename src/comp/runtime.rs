@@ -111,6 +111,14 @@ pub fn runtime_error(msg: &str) -> ! {
     std::process::exit(1);
 }
 
+pub fn runtime_error_with_location(msg: &str, file: &str, line: u32, col: u32) -> ! {
+    eprintln!(
+        "[!] Runtime error: {} (in {} at line {} col {})",
+        msg, file, line, col
+    );
+    std::process::exit(1);
+}
+
 // --- Builtins ---
 
 pub fn luma_print(val: &Value) {
@@ -413,39 +421,188 @@ pub fn luma_compare(left: &Value, right: &Value, op: &str) -> Value {
 // --- Method dispatch ---
 
 pub fn luma_method(object: Value, method: &str, args: Vec<Value>) -> Value {
+    luma_method_with_location(object, method, args, "", 0, 0)
+}
+
+pub fn luma_method_with_location(
+    object: Value,
+    method: &str,
+    args: Vec<Value>,
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
     match &object {
-        Value::Integer(n) => int_method(*n, method, &args),
-        Value::Float(f) => float_method(*f, method, &args),
-        Value::String(s) => string_method(s.clone(), method, &args),
-        Value::Char(c) => char_method(*c, method, &args),
-        Value::Boolean(b) => bool_method(*b, method),
-        Value::Option(inner) => maybe_method(inner.clone(), method, &args),
-        Value::List(items) => list_method(items.clone(), method, &args),
-        Value::Table(pairs) => table_method(pairs.clone(), method, &args),
-        Value::EnumVariant { .. } => runtime_error(&format!(
-            "{} has no method '{}'",
-            object.type_name(),
-            method
-        )),
-        Value::EnumVariantData { .. } => runtime_error(&format!(
-            "{} has no method '{}'",
-            object.type_name(),
-            method
-        )),
-        Value::Void => runtime_error(&format!(
-            "{} has no method '{}'",
-            object.type_name(),
-            method
-        )),
-        Value::Struct { name, fields } => {
-            struct_method(name.clone(), fields.clone(), method, &args)
+        Value::Integer(n) => int_method(*n, method, &args, file, line, col),
+        Value::Float(f) => float_method(*f, method, &args, file, line, col),
+        Value::String(s) => string_method(s.clone(), method, &args, file, line, col),
+        Value::Char(c) => char_method(*c, method, &args, file, line, col),
+        Value::Boolean(b) => bool_method(*b, method, file, line, col),
+        Value::Option(inner) => maybe_method(inner.clone(), method, &args, file, line, col),
+        Value::List(items) => {
+            list_method_with_location(items.clone(), method, &args, file, line, col)
         }
+        Value::Table(pairs) => table_method(pairs.clone(), method, &args, file, line, col),
+        Value::EnumVariant { .. } => runtime_error_with_location(
+            &format!("{} has no method '{}'", object.type_name(), method),
+            file,
+            line,
+            col,
+        ),
+        Value::EnumVariantData { .. } => runtime_error_with_location(
+            &format!("{} has no method '{}'", object.type_name(), method),
+            file,
+            line,
+            col,
+        ),
+        Value::Void => runtime_error_with_location(
+            &format!("{} has no method '{}'", object.type_name(), method),
+            file,
+            line,
+            col,
+        ),
+        Value::Struct { name, fields } => struct_method_with_location(
+            name.clone(),
+            fields.clone(),
+            method,
+            &args,
+            file,
+            line,
+            col,
+        ),
         Value::JsonHandle(s) => luma_json_method(s, method, &args),
         Value::TomlHandle(s) => luma_toml_method(s, method, &args),
     }
 }
 
-fn int_method(n: i64, method: &str, args: &[Value]) -> Value {
+fn list_method_with_location(
+    items: Vec<Value>,
+    method: &str,
+    args: &[Value],
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
+    match method {
+        "len" => Value::Integer(items.len() as i64),
+        "exists" => Value::Boolean(!items.is_empty()),
+        "get" => match args.first() {
+            Some(Value::Integer(i)) => {
+                let idx = *i as usize;
+                match items.get(idx) {
+                    Some(v) => v.clone(),
+                    None => runtime_error_with_location(
+                        &format!("list index {} out of bounds (len {})", i, items.len()),
+                        file,
+                        line,
+                        col,
+                    ),
+                }
+            }
+            _ => runtime_error_with_location(
+                "list.get() takes one integer argument",
+                file,
+                line,
+                col,
+            ),
+        },
+        "contains" => {
+            let target = args.first().unwrap_or_else(|| {
+                runtime_error_with_location("list.contains() takes one argument", file, line, col)
+            });
+            Value::Boolean(items.contains(target))
+        }
+        "where" => match args.first() {
+            Some(target) => {
+                let idx = items.iter().position(|v| v == target);
+                Value::Integer(idx.map(|i| i as i64).unwrap_or(-1))
+            }
+            _ => runtime_error_with_location("list.where() takes one argument", file, line, col),
+        },
+        "add" => {
+            let val = args.first().unwrap_or_else(|| {
+                runtime_error_with_location("list.add() takes one argument", file, line, col)
+            });
+            let mut new_items = items;
+            new_items.push(val.clone());
+            Value::List(new_items)
+        }
+        "remove" => match args.first() {
+            Some(Value::Integer(i)) => {
+                let idx = *i as usize;
+                if idx >= items.len() {
+                    runtime_error_with_location(
+                        &format!("list index {} out of bounds (len {})", i, items.len()),
+                        file,
+                        line,
+                        col,
+                    );
+                }
+                let mut new_items = items;
+                new_items.remove(idx);
+                Value::List(new_items)
+            }
+            _ => runtime_error_with_location(
+                "list.remove() takes one integer index argument",
+                file,
+                line,
+                col,
+            ),
+        },
+        "reverse" => {
+            let mut new_items = items;
+            new_items.reverse();
+            Value::List(new_items)
+        }
+        "sort" => {
+            let mut new_items = items;
+            new_items.sort_by(|a, b| match (a, b) {
+                (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
+                (Value::Float(x), Value::Float(y)) => {
+                    x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+                }
+                (Value::String(x), Value::String(y)) => x.cmp(y),
+                _ => std::cmp::Ordering::Equal,
+            });
+            Value::List(new_items)
+        }
+        "first" => match items.first() {
+            Some(v) => v.clone(),
+            None => {
+                runtime_error_with_location("list.first() called on empty list", file, line, col)
+            }
+        },
+        "last" => match items.last() {
+            Some(v) => v.clone(),
+            None => {
+                runtime_error_with_location("list.last() called on empty list", file, line, col)
+            }
+        },
+        "merge" => {
+            let glue = match args.first() {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Char(c)) => c.to_string(),
+                None => String::new(),
+                _ => runtime_error_with_location(
+                    "list.merge() takes a string separator argument",
+                    file,
+                    line,
+                    col,
+                ),
+            };
+            let parts: Vec<String> = items.iter().map(|v| format!("{}", v)).collect();
+            Value::String(parts.join(&glue))
+        }
+        _ => runtime_error_with_location(
+            &format!("list has no method '{}'", method),
+            file,
+            line,
+            col,
+        ),
+    }
+}
+
+fn int_method(n: i64, method: &str, args: &[Value], file: &str, line: u32, col: u32) -> Value {
     match method {
         "abs" => Value::Integer(n.abs()),
         "to_float" => Value::Float(n as f64),
@@ -453,13 +610,20 @@ fn int_method(n: i64, method: &str, args: &[Value]) -> Value {
         "exists" => Value::Boolean(n != 0),
         "pow" => match args.first() {
             Some(Value::Integer(exp)) if *exp >= 0 => Value::Integer(n.pow(*exp as u32)),
-            _ => runtime_error("int.pow() takes one non-negative integer argument"),
+            _ => runtime_error_with_location(
+                "int.pow() takes one non-negative integer argument",
+                file,
+                line,
+                col,
+            ),
         },
-        _ => runtime_error(&format!("int has no method '{}'", method)),
+        _ => {
+            runtime_error_with_location(&format!("int has no method '{}'", method), file, line, col)
+        }
     }
 }
 
-fn float_method(f: f64, method: &str, _args: &[Value]) -> Value {
+fn float_method(f: f64, method: &str, args: &[Value], file: &str, line: u32, col: u32) -> Value {
     match method {
         "abs" => Value::Float(f.abs()),
         "floor" => Value::Integer(f.floor() as i64),
@@ -468,11 +632,23 @@ fn float_method(f: f64, method: &str, _args: &[Value]) -> Value {
         "to_int" => Value::Integer(f as i64),
         "to_string" => Value::String(f.to_string()),
         "exists" => Value::Boolean(f != 0.0),
-        _ => runtime_error(&format!("float has no method '{}'", method)),
+        _ => runtime_error_with_location(
+            &format!("float has no method '{}'", method),
+            file,
+            line,
+            col,
+        ),
     }
 }
 
-fn string_method(s: String, method: &str, args: &[Value]) -> Value {
+fn string_method(
+    s: String,
+    method: &str,
+    args: &[Value],
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
     match method {
         "len" => Value::Integer(s.chars().count() as i64),
         "upper" => Value::String(s.to_uppercase()),
@@ -484,27 +660,49 @@ fn string_method(s: String, method: &str, args: &[Value]) -> Value {
         "contains" => match args.first() {
             Some(Value::String(sub)) => Value::Boolean(s.contains(sub.as_str())),
             Some(Value::Char(c)) => Value::Boolean(s.contains(*c)),
-            _ => runtime_error("contains() takes one string or char argument"),
+            _ => runtime_error_with_location(
+                "contains() takes one string or char argument",
+                file,
+                line,
+                col,
+            ),
         },
         "starts_with" => match args.first() {
             Some(Value::String(p)) => Value::Boolean(s.starts_with(p.as_str())),
             Some(Value::Char(c)) => Value::Boolean(s.starts_with(*c)),
-            _ => runtime_error("starts_with() takes one string or char argument"),
+            _ => runtime_error_with_location(
+                "starts_with() takes one string or char argument",
+                file,
+                line,
+                col,
+            ),
         },
         "ends_with" => match args.first() {
             Some(Value::String(p)) => Value::Boolean(s.ends_with(p.as_str())),
             Some(Value::Char(c)) => Value::Boolean(s.ends_with(*c)),
-            _ => runtime_error("ends_with() takes one string or char argument"),
+            _ => runtime_error_with_location(
+                "ends_with() takes one string or char argument",
+                file,
+                line,
+                col,
+            ),
         },
         "repeat" => match args.first() {
             Some(Value::Integer(n)) if *n >= 0 => Value::String(s.repeat(*n as usize)),
-            _ => runtime_error("repeat() takes one non-negative integer argument"),
+            _ => runtime_error_with_location(
+                "repeat() takes one non-negative integer argument",
+                file,
+                line,
+                col,
+            ),
         },
         "replace" => match (args.first(), args.get(1)) {
             (Some(Value::String(from)), Some(Value::String(to))) => {
                 Value::String(s.replace(from.as_str(), to.as_str()))
             }
-            _ => runtime_error("replace() takes two string arguments"),
+            _ => {
+                runtime_error_with_location("replace() takes two string arguments", file, line, col)
+            }
         },
         "split" => match args.first() {
             Some(Value::String(delim)) => Value::List(
@@ -520,7 +718,12 @@ fn string_method(s: String, method: &str, args: &[Value]) -> Value {
                     .map(|p| Value::String(p.to_string()))
                     .collect(),
             ),
-            _ => runtime_error("split() takes one string or char argument"),
+            _ => runtime_error_with_location(
+                "split() takes one string or char argument",
+                file,
+                line,
+                col,
+            ),
         },
         "first" => match s.chars().next() {
             Some(c) => Value::Option(Some(Box::new(Value::Char(c)))),
@@ -552,181 +755,128 @@ fn string_method(s: String, method: &str, args: &[Value]) -> Value {
                         Value::Option(None)
                     }
                 }
-                _ => runtime_error(&format!("as() unknown target type '{}'", target)),
+                _ => runtime_error_with_location(
+                    &format!("as() unknown target type '{}'", target),
+                    file,
+                    line,
+                    col,
+                ),
             },
-            _ => runtime_error("as() takes a type argument"),
+            _ => runtime_error_with_location("as() takes a type argument", file, line, col),
         },
-        _ => runtime_error(&format!("string has no method '{}'", method)),
+        _ => runtime_error_with_location(
+            &format!("string has no method '{}'", method),
+            file,
+            line,
+            col,
+        ),
     }
 }
 
-fn char_method(c: char, method: &str, args: &[Value]) -> Value {
+fn char_method(c: char, method: &str, args: &[Value], file: &str, line: u32, col: u32) -> Value {
     match method {
         "exists" => Value::Boolean(true),
         "to_string" => Value::String(c.to_string()),
         "to_int" => Value::Integer(c as i64),
-        _ => string_method(c.to_string(), method, args),
+        _ => string_method(c.to_string(), method, args, file, line, col),
     }
 }
 
-fn bool_method(b: bool, method: &str) -> Value {
+fn bool_method(b: bool, method: &str, file: &str, line: u32, col: u32) -> Value {
     match method {
         "to_string" => Value::String(b.to_string()),
         "exists" => Value::Boolean(b),
-        _ => runtime_error(&format!("bool has no method '{}'", method)),
+        _ => runtime_error_with_location(
+            &format!("bool has no method '{}'", method),
+            file,
+            line,
+            col,
+        ),
     }
 }
 
-fn maybe_method(inner: Option<Box<Value>>, method: &str, args: &[Value]) -> Value {
+fn maybe_method(
+    inner: Option<Box<Value>>,
+    method: &str,
+    args: &[Value],
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
     match method {
         "exists" => Value::Boolean(inner.is_some()),
         "or" => match inner {
             Some(v) => *v,
             None => match args.first() {
                 Some(v) => v.clone(),
-                None => runtime_error("maybe.or() requires a fallback value"),
+                None => runtime_error_with_location(
+                    "maybe.or() requires a fallback value",
+                    file,
+                    line,
+                    col,
+                ),
             },
         },
         _ => match inner {
-            Some(v) => luma_method(*v, method, args.to_vec()),
+            Some(v) => luma_method_with_location(*v, method, args.to_vec(), file, line, col),
             None => {
                 if method == "add" || method == "push" {
-                    list_method(vec![], method, args)
+                    list_method_with_location(vec![], method, args, file, line, col)
                 } else if method == "len" {
                     Value::Integer(0)
                 } else if method == "get" {
-                    runtime_error("Cannot get from empty list")
+                    runtime_error_with_location("Cannot get from empty list", file, line, col)
                 } else if method == "contains" || method == "where" {
                     Value::Boolean(false)
                 } else if method == "exists" {
                     Value::Boolean(false)
                 } else {
-                    runtime_error(&format!(
-                        "Cannot call '{}' on empty maybe — use .or() first",
-                        method
-                    ))
+                    runtime_error_with_location(
+                        &format!("Cannot call '{}' on empty maybe — use .or() first", method),
+                        file,
+                        line,
+                        col,
+                    )
                 }
             }
         },
     }
 }
 
-fn list_method(items: Vec<Value>, method: &str, args: &[Value]) -> Value {
-    match method {
-        "len" => Value::Integer(items.len() as i64),
-        "exists" => Value::Boolean(!items.is_empty()),
-        "get" => match args.first() {
-            Some(Value::Integer(i)) => {
-                let idx = *i as usize;
-                match items.get(idx) {
-                    Some(v) => v.clone(),
-                    None => runtime_error(&format!(
-                        "list index {} out of bounds (len {})",
-                        i,
-                        items.len()
-                    )),
-                }
-            }
-            _ => runtime_error("list.get() takes one integer argument"),
-        },
-        "contains" => {
-            let target = args
-                .first()
-                .unwrap_or_else(|| runtime_error("list.contains() takes one argument"));
-            Value::Boolean(items.contains(target))
-        }
-        "where" => match args.first() {
-            Some(target) => {
-                let idx = items.iter().position(|v| v == target);
-                Value::Integer(idx.map(|i| i as i64).unwrap_or(-1))
-            }
-            _ => runtime_error("list.where() takes one argument"),
-        },
-        "add" => {
-            let val = args
-                .first()
-                .unwrap_or_else(|| runtime_error("list.add() takes one argument"));
-            let mut new_items = items;
-            new_items.push(val.clone());
-            Value::List(new_items)
-        }
-        "remove" => match args.first() {
-            Some(Value::Integer(i)) => {
-                let idx = *i as usize;
-                if idx >= items.len() {
-                    runtime_error(&format!(
-                        "list index {} out of bounds (len {})",
-                        i,
-                        items.len()
-                    ));
-                }
-                let mut new_items = items;
-                new_items.remove(idx);
-                Value::List(new_items)
-            }
-            _ => runtime_error("list.remove() takes one integer index argument"),
-        },
-        "reverse" => {
-            let mut new_items = items;
-            new_items.reverse();
-            Value::List(new_items)
-        }
-        "sort" => {
-            let mut new_items = items;
-            new_items.sort_by(|a, b| match (a, b) {
-                (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
-                (Value::Float(x), Value::Float(y)) => {
-                    x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
-                }
-                (Value::String(x), Value::String(y)) => x.cmp(y),
-                _ => std::cmp::Ordering::Equal,
-            });
-            Value::List(new_items)
-        }
-        "first" => match items.first() {
-            Some(v) => v.clone(),
-            None => runtime_error("list.first() called on empty list"),
-        },
-        "last" => match items.last() {
-            Some(v) => v.clone(),
-            None => runtime_error("list.last() called on empty list"),
-        },
-        "merge" => {
-            let glue = match args.first() {
-                Some(Value::String(s)) => s.clone(),
-                Some(Value::Char(c)) => c.to_string(),
-                None => String::new(),
-                _ => runtime_error("list.merge() takes a string separator argument"),
-            };
-            let parts: Vec<String> = items.iter().map(|v| format!("{}", v)).collect();
-            Value::String(parts.join(&glue))
-        }
-        _ => runtime_error(&format!("list has no method '{}'", method)),
-    }
-}
-
-fn table_method(pairs: Vec<(Value, Value)>, method: &str, args: &[Value]) -> Value {
+fn table_method(
+    pairs: Vec<(Value, Value)>,
+    method: &str,
+    args: &[Value],
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
     match method {
         "len" => Value::Integer(pairs.len() as i64),
         "exists" => Value::Boolean(!pairs.is_empty()),
         "has" => {
-            let key = args
-                .first()
-                .unwrap_or_else(|| runtime_error("table.has() takes one argument"));
+            let key = args.first().unwrap_or_else(|| {
+                runtime_error_with_location("table.has() takes one argument", file, line, col)
+            });
             Value::Boolean(pairs.iter().any(|(k, _)| k == key))
         }
         "get" => {
-            let key = args
-                .first()
-                .unwrap_or_else(|| runtime_error("table.get() takes one argument"));
+            let key = args.first().unwrap_or_else(|| {
+                runtime_error_with_location("table.get() takes one argument", file, line, col)
+            });
             match pairs.iter().find(|(k, _)| k == key) {
                 Some((_, v)) => v.clone(),
-                None => runtime_error("table key not found"),
+                None => runtime_error_with_location("table key not found", file, line, col),
             }
         }
         "set" => {
             if args.len() != 2 {
-                runtime_error("table.set() takes two arguments (key, value)");
+                runtime_error_with_location(
+                    "table.set() takes two arguments (key, value)",
+                    file,
+                    line,
+                    col,
+                );
             }
             let key = args[0].clone();
             let val = args[1].clone();
@@ -739,16 +889,21 @@ fn table_method(pairs: Vec<(Value, Value)>, method: &str, args: &[Value]) -> Val
             Value::Table(new_pairs)
         }
         "remove" => {
-            let key = args
-                .first()
-                .unwrap_or_else(|| runtime_error("table.remove() takes one argument"));
+            let key = args.first().unwrap_or_else(|| {
+                runtime_error_with_location("table.remove() takes one argument", file, line, col)
+            });
             let mut new_pairs = pairs;
             new_pairs.retain(|(k, _)| k != key);
             Value::Table(new_pairs)
         }
         "keys" => Value::List(pairs.iter().map(|(k, _)| k.clone()).collect()),
         "values" => Value::List(pairs.iter().map(|(_, v)| v.clone()).collect()),
-        _ => runtime_error(&format!("table has no method '{}'", method)),
+        _ => runtime_error_with_location(
+            &format!("table has no method '{}'", method),
+            file,
+            line,
+            col,
+        ),
     }
 }
 
@@ -760,6 +915,18 @@ fn struct_method(
     method: &str,
     args: &[Value],
 ) -> Value {
+    struct_method_with_location(name, fields, method, args, "", 0, 0)
+}
+
+fn struct_method_with_location(
+    name: String,
+    fields: HashMap<String, Value>,
+    method: &str,
+    args: &[Value],
+    file: &str,
+    line: u32,
+    col: u32,
+) -> Value {
     match (name.as_str(), method) {
         (_, "sum") => {
             let vals: Vec<&Value> = fields.values().collect();
@@ -768,16 +935,23 @@ fn struct_method(
                     return Value::Integer(a + b);
                 }
             }
-            runtime_error(&format!(
-                "{}.sum() requires exactly two integer fields",
-                name
-            ))
+            runtime_error_with_location(
+                &format!("{}.sum() requires exactly two integer fields", name),
+                file,
+                line,
+                col,
+            )
         }
         (_, "greet") => {
             if let Some(Value::String(n)) = fields.get("name") {
                 return Value::String(format!("Hi, I am {}", n));
             }
-            runtime_error(&format!("{}.greet() requires a 'name' field", name))
+            runtime_error_with_location(
+                &format!("{}.greet() requires a 'name' field", name),
+                file,
+                line,
+                col,
+            )
         }
         (_, "next") => {
             if let Some(Value::Integer(v)) = fields.get("value") {
@@ -785,12 +959,22 @@ fn struct_method(
                     return Value::Integer(v + step);
                 }
             }
-            runtime_error(&format!(
-                "{}.next() requires integer value field and step argument",
-                name
-            ))
+            runtime_error_with_location(
+                &format!(
+                    "{}.next() requires integer value field and step argument",
+                    name
+                ),
+                file,
+                line,
+                col,
+            )
         }
-        _ => runtime_error(&format!("{} has no method '{}'", name, method)),
+        _ => runtime_error_with_location(
+            &format!("{} has no method '{}'", name, method),
+            file,
+            line,
+            col,
+        ),
     }
 }
 

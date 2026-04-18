@@ -60,25 +60,29 @@ impl RuntimeError {
 }
 
 impl Value {
-    pub fn type_name(&self) -> &'static str {
+    pub fn type_name(&self) -> String {
         match self {
-            Value::Integer(_) => "int",
-            Value::Float(_) => "float",
-            Value::String(_) => "string",
-            Value::Char(_) => "char",
-            Value::Boolean(_) => "bool",
-            Value::Void => "void",
-            Value::Option(_) => "option",
-            Value::List(_) => "list",
-            Value::Table(_) => "table",
-            Value::FetchHandle(_) => "fetch",
-            Value::InputHandle => "input",
-            Value::FileHandle(_) => "file",
-            Value::JsonHandle(_) => "json",
-            Value::TomlHandle(_) => "toml",
-            Value::Struct { .. } => "struct",
-            Value::EnumVariant { .. } => "enum",
-            Value::EnumVariantData { .. } => "enum",
+            Value::Integer(_) => "int".to_string(),
+            Value::Float(_) => "float".to_string(),
+            Value::String(_) => "string".to_string(),
+            Value::Char(_) => "char".to_string(),
+            Value::Boolean(_) => "bool".to_string(),
+            Value::Void => "void".to_string(),
+            Value::Option(_) => "option".to_string(),
+            Value::List(_) => "list".to_string(),
+            Value::Table(_) => "table".to_string(),
+            Value::FetchHandle(_) => "fetch".to_string(),
+            Value::InputHandle => "input".to_string(),
+            Value::FileHandle(_) => "file".to_string(),
+            Value::JsonHandle(_) => "json".to_string(),
+            Value::TomlHandle(_) => "toml".to_string(),
+            Value::Struct { name, .. } => name.clone(),
+            Value::EnumVariant { enum_name, variant } => format!("{}.{}", enum_name, variant),
+            Value::EnumVariantData {
+                enum_name,
+                variant,
+                data: _,
+            } => format!("{}.{}(..)", enum_name, variant),
         }
     }
 }

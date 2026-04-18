@@ -151,11 +151,6 @@ impl Interpreter {
             (t, Value::Option(inner)) if t.starts_with("option") => Value::Option(inner),
             (t, Value::Void) if t.starts_with("option") => Value::Option(None),
             (t, v) if t.starts_with("option") => Value::Option(Some(Box::new(v))),
-            (t, Value::Void) if t.starts_with("option") => Value::Option(None),
-            (t, v) if t.starts_with("option") => {
-                eprintln!("DEBUG option coercion: type={}, val={:?}", t, v);
-                Value::Option(Some(Box::new(v)))
-            }
 
             // worry
             (t, v) if t.starts_with("worry") => v,
@@ -168,8 +163,10 @@ impl Interpreter {
             (t, Value::Table(pairs)) if t.starts_with("table") => Value::Table(pairs),
             (t, Value::Option(None)) if t.starts_with("table") => Value::Table(Vec::new()),
 
-            // struct
-            (t, Value::Struct { name, fields }) if t == name => Value::Struct { name, fields },
+            // struct - allow if exact match or actual name starts with expected (Node -> FnDecl, Param, etc.)
+            (t, Value::Struct { name, fields }) if t == name || name.starts_with(t) => {
+                Value::Struct { name, fields }
+            }
 
             // enum variant — type_name is the enum name
             (t, Value::EnumVariant { enum_name, variant }) if t == enum_name => {
@@ -193,7 +190,7 @@ impl Interpreter {
             (expected, actual) => {
                 return Err(RuntimeError {
                     message: format!(
-                        "Type mismatch: expected {}, got {}",
+                        "Type mismatch: expected {}, got '{}'",
                         expected,
                         actual.type_name()
                     ),

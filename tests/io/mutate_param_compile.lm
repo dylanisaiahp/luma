@@ -1,0 +1,9 @@
+void main() {
+    int counter = advance(0);
+    print(counter);
+}
+
+int advance(int e) {
+    e = e + 1;
+    return e;
+}

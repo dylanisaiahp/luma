@@ -15,6 +15,7 @@ const RUNTIME_SRC: &str = include_str!("runtime.rs");
 pub struct CompileOptions {
     pub output_name: String,
     pub output_dir: String,
+    pub source_file: Option<String>,
 }
 
 impl Default for CompileOptions {
@@ -22,6 +23,7 @@ impl Default for CompileOptions {
         Self {
             output_name: "program".to_string(),
             output_dir: "builds".to_string(),
+            source_file: None,
         }
     }
 }
@@ -35,7 +37,10 @@ pub fn compile(stmts: Vec<Stmt>, options: CompileOptions) -> anyhow::Result<()> 
     fs::write(&runtime_path, RUNTIME_SRC)?;
 
     // Generate Rust source from AST
-    let codegen = Codegen::new();
+    let codegen = match &options.source_file {
+        Some(file) => Codegen::new().with_file(file),
+        None => Codegen::new(),
+    };
     let generated = codegen.generate(&stmts);
     let source_path = build_dir.join(format!("{}.rs", options.output_name));
     fs::write(&source_path, &generated)?;
