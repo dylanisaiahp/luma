@@ -417,11 +417,7 @@ pub fn eval_home(
         });
     }
 
-    Ok(Value::String(
-        dirs::home_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default(),
-    ))
+    Ok(Value::String(std::env::var("HOME").unwrap_or_default()))
 }
 
 pub fn eval_run(
