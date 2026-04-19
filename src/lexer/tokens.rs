@@ -46,6 +46,8 @@ pub enum TokenKind {
     Mutable,
     Const,
     Enum,
+    Env,
+    Home,
     Identifier(String),
     Number(i64),
     FloatLiteral(f64),
@@ -120,6 +122,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Mutable => write!(f, "mutable"),
             TokenKind::Const => write!(f, "const"),
             TokenKind::Enum => write!(f, "enum"),
+            TokenKind::Env => write!(f, "env"),
+            TokenKind::Home => write!(f, "home"),
             TokenKind::Identifier(s) => write!(f, "{}", s),
             TokenKind::Number(n) => write!(f, "{}", n),
             TokenKind::FloatLiteral(n) => write!(f, "{}", n),
@@ -196,6 +200,8 @@ impl From<crate::syntax::Keyword> for TokenKind {
             crate::syntax::Keyword::Mutable => TokenKind::Mutable,
             crate::syntax::Keyword::Const => TokenKind::Const,
             crate::syntax::Keyword::Enum => TokenKind::Enum,
+            crate::syntax::Keyword::Env => TokenKind::Env,
+            crate::syntax::Keyword::Home => TokenKind::Home,
         }
     }
 }

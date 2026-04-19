@@ -38,6 +38,8 @@ pub enum Keyword {
     Mutable,
     Const,
     Enum,
+    Env,
+    Home,
 }
 
 impl FromStr for Keyword {
@@ -79,6 +81,8 @@ impl FromStr for Keyword {
             "mutable" => Ok(Keyword::Mutable),
             "const" => Ok(Keyword::Const),
             "enum" => Ok(Keyword::Enum),
+            "env" => Ok(Keyword::Env),
+            "home" => Ok(Keyword::Home),
             _ => Err(()),
         }
     }

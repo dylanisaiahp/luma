@@ -10,8 +10,8 @@ pub use collections::{list_method, table_method};
 pub use convert::{eval_float, eval_int, eval_random, eval_string};
 pub use handles::{fetch_method, file_method, input_method, json_method, toml_method};
 pub use io::{
-    eval_fetch, eval_file, eval_input, eval_json, eval_read, eval_read_n, eval_run, eval_toml,
-    eval_write,
+    eval_env, eval_fetch, eval_file, eval_home, eval_input, eval_json, eval_read, eval_read_n,
+    eval_run, eval_toml, eval_write,
 };
 pub use numeric::{float_method, int_method};
 pub use text::{char_method, string_method};

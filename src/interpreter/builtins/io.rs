@@ -375,6 +375,55 @@ fn value_to_toml_value(value: &Value) -> toml::Value {
     }
 }
 
+pub fn eval_env(
+    args: &[crate::ast::Expr],
+    interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if args.len() != 1 {
+        return Err(RuntimeError {
+            message: "env() takes exactly one argument (key)".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
+    }
+
+    let key_val = interpreter.evaluate_expression(&args[0])?;
+    match key_val {
+        Value::String(key) => Ok(Value::String(std::env::var(&key).unwrap_or_default())),
+        _ => Err(RuntimeError {
+            message: "env() argument must be a string".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        }),
+    }
+}
+
+pub fn eval_home(
+    _args: &[crate::ast::Expr],
+    _interpreter: &mut crate::interpreter::Interpreter,
+    line: usize,
+    column: usize,
+) -> Result<Value, RuntimeError> {
+    if !_args.is_empty() {
+        return Err(RuntimeError {
+            message: "home() takes no arguments".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
+    }
+
+    Ok(Value::String(
+        dirs::home_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default(),
+    ))
+}
+
 pub fn eval_run(
     args: &[crate::ast::Expr],
     interpreter: &mut crate::interpreter::Interpreter,

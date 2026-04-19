@@ -143,6 +143,21 @@ pub fn luma_read() -> Value {
     Value::String(input.trim().to_string())
 }
 
+pub fn luma_env(key: &Value) -> Value {
+    match key {
+        Value::String(k) => Value::String(std::env::var(k).unwrap_or_default()),
+        _ => runtime_error("env() argument must be a string"),
+    }
+}
+
+pub fn luma_home() -> Value {
+    Value::String(
+        dirs::home_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default(),
+    )
+}
+
 pub fn luma_random(min: &Value, max: &Value) -> Value {
     use std::time::{SystemTime, UNIX_EPOCH};
     match (min, max) {

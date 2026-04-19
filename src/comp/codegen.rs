@@ -787,6 +787,8 @@ impl Codegen {
                             .join(", ");
                         format!("luma_run(&[{}])", parts)
                     }
+                    "env" => format!("luma_env(&{})", arg_exprs[0]),
+                    "home" => "luma_home()".to_string(),
                     _ => {
                         // user-defined function
                         format!("luma_fn_{}({})", name, arg_exprs.join(", "))

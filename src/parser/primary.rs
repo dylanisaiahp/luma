@@ -171,13 +171,17 @@ impl Parser {
                     | TokenKind::Int
                     | TokenKind::Float
                     | TokenKind::String
-                    | TokenKind::Char => {
+                    | TokenKind::Char
+                    | TokenKind::Env
+                    | TokenKind::Home => {
                         let name = match token.kind {
                             TokenKind::Read => "read".to_string(),
                             TokenKind::Int => "int".to_string(),
                             TokenKind::Float => "float".to_string(),
                             TokenKind::String => "string".to_string(),
                             TokenKind::Char => "char".to_string(),
+                            TokenKind::Env => "env".to_string(),
+                            TokenKind::Home => "home".to_string(),
                             _ => panic!("type keyword expected"),
                         };
                         self.advance();
