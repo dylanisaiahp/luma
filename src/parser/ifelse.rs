@@ -37,11 +37,7 @@ impl Parser {
             Some(TokenKind::Else) => {
                 self.advance();
                 if let Some(TokenKind::If) = self.current_token().map(|t| &t.kind) {
-                    if let Some(inner_if) = self.parse_if_statement() {
-                        Some(Some(vec![inner_if]))
-                    } else {
-                        None
-                    }
+                    self.parse_if_statement().map(|inner_if| Some(vec![inner_if]))
                 } else {
                     let else_branch = self.parse_block()?;
                     Some(Some(else_branch))
