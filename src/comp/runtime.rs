@@ -661,7 +661,7 @@ fn string_method(
     col: u32,
 ) -> Value {
     match method {
-        "len" => Value::Integer(s.chars().count() as i64),
+        "len" => Value::Integer(s.len() as i64),
         "upper" => Value::String(s.to_uppercase()),
         "lower" => Value::String(s.to_lowercase()),
         "trim" => Value::String(s.trim().to_string()),

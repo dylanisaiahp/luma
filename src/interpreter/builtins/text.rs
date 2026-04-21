@@ -10,7 +10,7 @@ pub fn text_methods(
     column: usize,
 ) -> Option<Result<Value, RuntimeError>> {
     match method {
-        "len" => Some(Ok(Value::Integer(s.chars().count() as i64))),
+        "len" => Some(Ok(Value::Integer(s.len() as i64))),
         "upper" => Some(Ok(Value::String(s.to_uppercase()))),
         "lower" => Some(Ok(Value::String(s.to_lowercase()))),
         "trim" => Some(Ok(Value::String(s.trim().to_string()))),
