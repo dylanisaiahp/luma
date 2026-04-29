@@ -105,7 +105,7 @@ impl Interpreter {
             ExprKind::Call { name, args } => match name.as_str() {
                 "read" => builtins::eval_read(args, expr.line, expr.column),
                 "read_n" => builtins::eval_read_n(args, self, expr.line, expr.column),
-                "input" => builtins::eval_input(args, self, expr.line, expr.column),
+                "args" => builtins::eval_args(args, self, expr.line, expr.column),
                 "fetch" => builtins::eval_fetch(args, self, expr.line, expr.column),
                 "file" => builtins::eval_file(args, self, expr.line, expr.column),
                 "json" => builtins::eval_json(args, self, expr.line, expr.column),

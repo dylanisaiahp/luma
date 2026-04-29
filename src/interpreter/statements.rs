@@ -53,7 +53,6 @@ impl Interpreter {
                 format!("({})", parts.join(", "))
             }
             Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
-            Value::InputHandle => "input()".to_string(),
             Value::FileHandle(path) => format!("file(\"{}\")", path),
             Value::JsonHandle(s) => format!("json(\"{}\")", s),
             Value::TomlHandle(s) => format!("toml(\"{}\")", s),

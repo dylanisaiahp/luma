@@ -79,80 +79,6 @@ pub fn fetch_method(
     }
 }
 
-pub fn input_method(
-    method: &str,
-    _args: &[Value],
-    line: usize,
-    column: usize,
-) -> Result<Value, RuntimeError> {
-    // Get raw CLI args (skip: program name, "run", file path)
-    let raw: Vec<String> = std::env::args().skip(3).collect();
-
-    match method {
-        // Positional args — everything that doesn't start with -
-        "args" => {
-            let positional: Vec<Value> = raw
-                .iter()
-                .filter(|a| !a.starts_with('-'))
-                .map(|a| Value::String(a.clone()))
-                .collect();
-            Ok(Value::List(positional))
-        }
-        // Flags — args starting with - or --, strip the dashes, no value after
-        "flags" => {
-            let mut flags: Vec<Value> = Vec::new();
-            let mut i = 0;
-            while i < raw.len() {
-                let arg = &raw[i];
-                if arg.starts_with("--") {
-                    // Check if next arg is a value (not a flag)
-                    let next_is_value =
-                        raw.get(i + 1).map(|n| !n.starts_with('-')).unwrap_or(false);
-                    if !next_is_value {
-                        flags.push(Value::String(arg.trim_start_matches('-').to_string()));
-                    }
-                    i += if next_is_value { 2 } else { 1 };
-                } else if arg.starts_with('-') {
-                    let next_is_value =
-                        raw.get(i + 1).map(|n| !n.starts_with('-')).unwrap_or(false);
-                    if !next_is_value {
-                        flags.push(Value::String(arg.trim_start_matches('-').to_string()));
-                    }
-                    i += if next_is_value { 2 } else { 1 };
-                } else {
-                    i += 1;
-                }
-            }
-            Ok(Value::List(flags))
-        }
-        // Options — flags that have a value after them, returned as table(string, string)
-        "options" => {
-            let mut opts: Vec<(Value, Value)> = Vec::new();
-            let mut i = 0;
-            while i < raw.len() {
-                let arg = &raw[i];
-                if arg.starts_with('-')
-                    && let Some(next) = raw.get(i + 1)
-                    && !next.starts_with('-')
-                {
-                    let key = arg.trim_start_matches('-').to_string();
-                    opts.push((Value::String(key), Value::String(next.clone())));
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-            Ok(Value::Table(opts))
-        }
-        _ => Err(RuntimeError {
-            message: format!("input() has no method '{}'", method),
-            file_path: String::new(),
-            line,
-            column,
-        }),
-    }
-}
-
 pub fn file_method(
     path: &str,
     method: &str,
@@ -457,7 +383,7 @@ fn value_to_json_value(value: &Value) -> serde_json::Value {
             }
             serde_json::Value::Object(map)
         }
-        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
+        Value::FetchHandle(_) | Value::FileHandle(_) => {
             serde_json::Value::String("<handle>".to_string())
         }
         Value::JsonHandle(_) | Value::TomlHandle(_) => {
@@ -610,9 +536,7 @@ fn value_to_toml_value(value: &Value) -> toml::Value {
             }
             toml::Value::Table(map)
         }
-        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
-            toml::Value::String("<handle>".to_string())
-        }
+        Value::FetchHandle(_) | Value::FileHandle(_) => toml::Value::String("<handle>".to_string()),
         Value::JsonHandle(_) | Value::TomlHandle(_) => toml::Value::String("<handle>".to_string()),
         Value::Struct { .. } => toml::Value::String("<struct>".to_string()),
         Value::EnumVariant { .. } => toml::Value::String("<enum>".to_string()),

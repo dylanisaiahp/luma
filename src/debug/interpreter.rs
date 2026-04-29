@@ -91,7 +91,6 @@ fn format_value(val: &Value) -> String {
         Value::List(items) => format!("List({})", items.len()),
         Value::Table(pairs) => format!("Table({})", pairs.len()),
         Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
-        Value::InputHandle => "input()".to_string(),
         Value::FileHandle(path) => format!("file(\"{}\")", path),
         Value::JsonHandle(s) => format!("json(\"{}\")", s),
         Value::TomlHandle(s) => format!("toml(\"{}\")", s),

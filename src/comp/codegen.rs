@@ -738,7 +738,7 @@ impl Codegen {
                     "int" => format!("luma_int(&{})", arg_exprs[0]),
                     "float" => format!("luma_float(&{})", arg_exprs[0]),
                     "string" => format!("luma_string(&{})", arg_exprs[0]),
-                    "input" => "Value::Void".to_string(), // handle via method
+                    "args" => "luma_args()".to_string(),
                     "fetch" => {
                         if arg_exprs.is_empty() {
                             format!(

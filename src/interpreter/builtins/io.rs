@@ -129,41 +129,22 @@ pub fn eval_write(
     Ok(Value::Void)
 }
 
-pub fn eval_input(
-    args: &[crate::ast::Expr],
-    interpreter: &mut crate::interpreter::Interpreter,
+pub fn eval_args(
+    _args: &[crate::ast::Expr],
+    _interpreter: &mut crate::interpreter::Interpreter,
     line: usize,
     column: usize,
 ) -> Result<Value, RuntimeError> {
-    if args.is_empty() {
-        return Ok(Value::InputHandle);
+    if !_args.is_empty() {
+        return Err(RuntimeError {
+            message: "args() takes no arguments".to_string(),
+            file_path: String::new(),
+            line,
+            column,
+        });
     }
-
-    if args.len() == 1 {
-        let val = interpreter.evaluate_expression(&args[0])?;
-        let index = match val {
-            Value::Integer(n) if n >= 0 => n as usize,
-            _ => {
-                return Err(RuntimeError {
-                    message: "input() index must be a non-negative integer".to_string(),
-                    file_path: String::new(),
-                    line,
-                    column,
-                });
-            }
-        };
-        let user_args: Vec<String> = std::env::args().skip(3).collect();
-        return Ok(Value::String(
-            user_args.get(index).cloned().unwrap_or_default(),
-        ));
-    }
-
-    Err(RuntimeError {
-        message: "input() takes 0 or 1 arguments".to_string(),
-        file_path: String::new(),
-        line,
-        column,
-    })
+    let user_args: Vec<Value> = std::env::args().skip(3).map(Value::String).collect();
+    Ok(Value::List(user_args))
 }
 
 pub fn eval_fetch(
@@ -287,7 +268,7 @@ fn value_to_json_value(value: &Value) -> serde_json::Value {
             }
             serde_json::Value::Object(map)
         }
-        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
+        Value::FetchHandle(_) | Value::FileHandle(_) => {
             serde_json::Value::String("<handle>".to_string())
         }
         Value::JsonHandle(_) | Value::TomlHandle(_) => {
@@ -365,9 +346,7 @@ fn value_to_toml_value(value: &Value) -> toml::Value {
             }
             toml::Value::Table(map)
         }
-        Value::FetchHandle(_) | Value::InputHandle | Value::FileHandle(_) => {
-            toml::Value::String("<handle>".to_string())
-        }
+        Value::FetchHandle(_) | Value::FileHandle(_) => toml::Value::String("<handle>".to_string()),
         Value::JsonHandle(_) | Value::TomlHandle(_) => toml::Value::String("<handle>".to_string()),
         Value::Struct { .. } => toml::Value::String("<struct>".to_string()),
         Value::EnumVariant { .. } => toml::Value::String("<enum>".to_string()),

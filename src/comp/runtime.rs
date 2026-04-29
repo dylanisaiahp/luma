@@ -1088,35 +1088,17 @@ pub fn luma_fetch_method(url: &str, method: &str, _args: &[Value]) -> Value {
     ))
 }
 
+// --- Args (replaces input().args()) ---
+
+pub fn luma_args() -> Value {
+    let user_args: Vec<Value> = std::env::args().skip(3).map(Value::String).collect();
+    Value::List(user_args)
+}
+
 // --- Input handle ---
 
 pub fn luma_input_method(method: &str) -> Value {
-    let raw: Vec<String> = std::env::args().skip(1).collect();
     match method {
-        "args" => Value::List(
-            raw.iter()
-                .filter(|a| !a.starts_with('-'))
-                .map(|a| Value::String(a.clone()))
-                .collect(),
-        ),
-        "flags" => {
-            let mut flags: Vec<Value> = Vec::new();
-            let mut i = 0;
-            while i < raw.len() {
-                let arg = &raw[i];
-                if arg.starts_with('-') {
-                    let next_is_value =
-                        raw.get(i + 1).map(|n| !n.starts_with('-')).unwrap_or(false);
-                    if !next_is_value {
-                        flags.push(Value::String(arg.trim_start_matches('-').to_string()));
-                    }
-                    i += if next_is_value { 2 } else { 1 };
-                } else {
-                    i += 1;
-                }
-            }
-            Value::List(flags)
-        }
         "options" => {
             let mut opts: Vec<(Value, Value)> = Vec::new();
             let mut i = 0;
