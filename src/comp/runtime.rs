@@ -1091,35 +1091,8 @@ pub fn luma_fetch_method(url: &str, method: &str, _args: &[Value]) -> Value {
 // --- Args (replaces input().args()) ---
 
 pub fn luma_args() -> Value {
-    let user_args: Vec<Value> = std::env::args().skip(3).map(Value::String).collect();
-    Value::List(user_args)
-}
-
-// --- Input handle ---
-
-pub fn luma_input_method(method: &str) -> Value {
-    match method {
-        "options" => {
-            let mut opts: Vec<(Value, Value)> = Vec::new();
-            let mut i = 0;
-            while i < raw.len() {
-                let arg = &raw[i];
-                if arg.starts_with('-') {
-                    if let Some(next) = raw.get(i + 1) {
-                        if !next.starts_with('-') {
-                            let key = arg.trim_start_matches('-').to_string();
-                            opts.push((Value::String(key), Value::String(next.clone())));
-                            i += 2;
-                            continue;
-                        }
-                    }
-                }
-                i += 1;
-            }
-            Value::Table(opts)
-        }
-        _ => runtime_error(&format!("input() has no method '{}'", method)),
-    }
+    let args: Vec<Value> = std::env::args().skip(1).map(|s| Value::String(s)).collect();
+    Value::List(args)
 }
 
 // --- Read N bytes ---

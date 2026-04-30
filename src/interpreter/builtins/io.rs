@@ -143,8 +143,8 @@ pub fn eval_args(
             column,
         });
     }
-    let user_args: Vec<Value> = std::env::args().skip(3).map(Value::String).collect();
-    Ok(Value::List(user_args))
+    let args: Vec<Value> = std::env::args().skip(1).map(|s| Value::String(s)).collect();
+    Ok(Value::List(args))
 }
 
 pub fn eval_fetch(
