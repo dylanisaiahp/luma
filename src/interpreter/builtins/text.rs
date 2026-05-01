@@ -15,7 +15,7 @@ pub fn text_methods(
         "lower" => Some(Ok(Value::String(s.to_lowercase()))),
         "trim" => Some(Ok(Value::String(s.trim().to_string()))),
         "reverse" => Some(Ok(Value::String(s.chars().rev().collect()))),
-        "chars" => Some(Ok(Value::List(s.chars().map(Value::Char).collect()))),
+        "chars" => Some(Ok(Value::List(s.chars().map(|c| Value::String(c.to_string())).collect()))),
         "exists" => Some(Ok(Value::Boolean(!s.is_empty()))),
         "contains" => Some(match args.first() {
             Some(Value::String(sub)) => Ok(Value::Boolean(s.contains(sub.as_str()))),
