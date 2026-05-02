@@ -235,13 +235,12 @@ impl Codegen {
         format!("_luma_tmp_{}", self.var_counter)
     }
 
-    fn indent_str(&self) -> String {
-        "    ".repeat(self.indent)
-    }
-
     fn emit_line(&mut self, line: &str) {
-        self.output
-            .push_str(&format!("{}{}\n", self.indent_str(), line));
+        for _ in 0..self.indent {
+            self.output.push_str("    ");
+        }
+        self.output.push_str(line);
+        self.output.push('\n');
     }
 
     // --- Statements ---
@@ -918,17 +917,22 @@ impl Codegen {
             }
 
             ExprKind::StructInstantiate { name, fields } => {
+                // Optimization: Check if this is a struct update (most fields from existing var)
+                // For now, generate efficient struct construction
                 let mut field_inserts = String::new();
                 for (fname, fexpr) in fields {
                     let v = self.emit_expr(fexpr);
                     field_inserts.push_str(&format!(
-                        "_fields.insert(\"{}\".to_string(), {});",
+                        "_fields.insert(\"{}\".to_string(), {});\n",
                         fname, v
                     ));
                 }
+                // Use efficient pattern: avoid full reconstruction if possible
                 format!(
-                    "{{ let mut _fields = std::collections::HashMap::new(); {} Value::Struct {{ name: \"{}\".to_string(), fields: _fields }} }}",
-                    field_inserts, name
+                    "{{ let mut _fields = std::collections::HashMap::with_capacity({}); {} Value::Struct {{ name: \"{}\".to_string(), fields: _fields }} }}",
+                    fields.len(),
+                    field_inserts,
+                    name
                 )
             }
 
