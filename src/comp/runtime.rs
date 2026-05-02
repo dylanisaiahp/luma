@@ -666,7 +666,7 @@ fn string_method(
         "lower" => Value::String(s.to_lowercase()),
         "trim" => Value::String(s.trim().to_string()),
         "reverse" => Value::String(s.chars().rev().collect()),
-        "chars" => Value::List(s.chars().map(Value::Char).collect()),
+        "chars" => Value::List(s.chars().map(|c| Value::String(c.to_string())).collect()),
         "exists" => Value::Boolean(!s.is_empty()),
         "contains" => match args.first() {
             Some(Value::String(sub)) => Value::Boolean(s.contains(sub.as_str())),
