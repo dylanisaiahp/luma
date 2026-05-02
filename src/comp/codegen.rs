@@ -673,39 +673,35 @@ impl Codegen {
             }
 
             ExprKind::BinaryOp { left, op, right } => {
-                let l = self.emit_expr(left);
-                let r = self.emit_expr(right);
                 match op {
-                    BinaryOp::Add => format!("luma_add({}, {})", l, r),
-                    BinaryOp::Subtract => format!("luma_subtract({}, {})", l, r),
-                    BinaryOp::Multiply => format!("luma_multiply({}, {})", l, r),
-                    BinaryOp::Divide => format!("luma_divide({}, {})", l, r),
-                    BinaryOp::Modulo => format!("luma_modulo({}, {})", l, r),
-                    BinaryOp::Equal => format!("luma_compare(&{}, &{}, \"==\")", l, r),
-                    BinaryOp::NotEqual => format!("luma_compare(&{}, &{}, \"!=\")", l, r),
-                    BinaryOp::Greater => format!("luma_compare(&{}, &{}, \">\")", l, r),
-                    BinaryOp::Less => format!("luma_compare(&{}, &{}, \"<\")", l, r),
-                    BinaryOp::GreaterEqual => format!("luma_compare(&{}, &{}, \">=\")", l, r),
-                    BinaryOp::LessEqual => format!("luma_compare(&{}, &{}, \"<=\")", l, r),
+                    BinaryOp::Add => format!("luma_add({}, {})", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Subtract => format!("luma_subtract({}, {})", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Multiply => format!("luma_multiply({}, {})", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Divide => format!("luma_divide({}, {})", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Modulo => format!("luma_modulo({}, {})", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Equal => format!("luma_compare(&{}, &{}, \"==\")", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::NotEqual => format!("luma_compare(&{}, &{}, \"!=\")", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Greater => format!("luma_compare(&{}, &{}, \">\")", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::Less => format!("luma_compare(&{}, &{}, \"<\")", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::GreaterEqual => format!("luma_compare(&{}, &{}, \">=\")", self.emit_expr(left), self.emit_expr(right)),
+                    BinaryOp::LessEqual => format!("luma_compare(&{}, &{}, \"<=\")", self.emit_expr(left), self.emit_expr(right)),
                     BinaryOp::And => format!(
                         "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }} }}",
-                        l, r, self.current_file
+                        self.emit_expr(left), self.emit_expr(right), self.current_file
                     ),
                     BinaryOp::Or => format!(
                         "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }} }}",
-                        l, r, self.current_file
+                        self.emit_expr(left), self.emit_expr(right), self.current_file
                     ),
                 }
             }
 
             ExprKind::Assign { name, value } => {
-                let v = self.emit_expr(value);
                 self.mutated_vars.insert(name.clone());
-                format!("{{ {} = {}; {}.clone() }}", name, v, name)
+                format!("{{ {} = {}; {}.clone() }}", name, self.emit_expr(value), name)
             }
 
             ExprKind::AssignOp { name, op, value } => {
-                let v = self.emit_expr(value);
                 let op_fn = match op {
                     crate::ast::AssignOpKind::Add => "luma_add",
                     crate::ast::AssignOpKind::Subtract => "luma_subtract",
@@ -715,82 +711,81 @@ impl Codegen {
                 self.mutated_vars.insert(name.clone());
                 format!(
                     "{{ {} = {}({}.clone(), {}); {}.clone() }}",
-                    name, op_fn, name, v, name
+                    name, op_fn, name, self.emit_expr(value), name
                 )
             }
 
             ExprKind::Call { name, args } => {
-                let arg_exprs: Vec<String> = args.iter().map(|a| self.emit_expr(a)).collect();
                 match name.as_str() {
                     "print" => {
                         // handled as Stmt::Print but may appear as expr
-                        format!("{{ luma_print(&{}); Value::Void }}", arg_exprs.join(", "))
+                        format!("{{ luma_print(&{}); Value::Void }}", args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
                     }
                     "write" => {
-                        format!("{{ luma_write(&{}); Value::Void }}", arg_exprs.join(", "))
+                        format!("{{ luma_write(&{}); Value::Void }}", args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
                     }
                     "read" => "luma_read()".to_string(),
-                    "read_n" => format!("luma_read_n(&{})", arg_exprs[0]),
+                    "read_n" => format!("luma_read_n(&{})", self.emit_expr(&args[0])),
                     "random" => {
-                        format!("luma_random(&{}, &{})", arg_exprs[0], arg_exprs[1])
+                        format!("luma_random(&{}, &{})", self.emit_expr(&args[0]), self.emit_expr(&args[1]))
                     }
-                    "int" => format!("luma_int(&{})", arg_exprs[0]),
-                    "float" => format!("luma_float(&{})", arg_exprs[0]),
-                    "string" => format!("luma_string(&{})", arg_exprs[0]),
+                    "int" => format!("luma_int(&{})", self.emit_expr(&args[0])),
+                    "float" => format!("luma_float(&{})", self.emit_expr(&args[0])),
+                    "string" => format!("luma_string(&{})", self.emit_expr(&args[0])),
                     "args" => "luma_args()".to_string(),
                     "fetch" => {
-                        if arg_exprs.is_empty() {
+                        if args.is_empty() {
                             format!(
                                 "luma_runtime::runtime_error_with_location(\"fetch() requires exactly one argument\", \"{}\", 0, 0)",
                                 self.current_file
                             )
                         } else {
-                            format!("Value::String({})", arg_exprs[0])
+                            format!("Value::String({})", self.emit_expr(&args[0]))
                         }
                     }
                     "file" => {
-                        if arg_exprs.is_empty() {
+                        if args.is_empty() {
                             format!(
                                 "luma_runtime::runtime_error_with_location(\"file() requires exactly one argument\", \"{}\", 0, 0)",
                                 self.current_file
                             )
                         } else {
-                            arg_exprs[0].clone()
+                            self.emit_expr(&args[0])
                         }
                     }
                     "json" => {
-                        if arg_exprs.is_empty() {
+                        if args.is_empty() {
                             format!(
                                 "luma_runtime::runtime_error_with_location(\"json() requires exactly one argument\", \"{}\", 0, 0)",
                                 self.current_file
                             )
                         } else {
-                            format!("luma_json(&{})", arg_exprs[0])
+                            format!("luma_json(&{})", self.emit_expr(&args[0]))
                         }
                     }
                     "toml" => {
-                        if arg_exprs.is_empty() {
+                        if args.is_empty() {
                             format!(
                                 "luma_runtime::runtime_error_with_location(\"toml() requires exactly one argument\", \"{}\", 0, 0)",
                                 self.current_file
                             )
                         } else {
-                            format!("luma_toml(&{})", arg_exprs[0])
+                            format!("luma_toml(&{})", self.emit_expr(&args[0]))
                         }
                     }
                     "run" => {
-                        let parts = arg_exprs
+                        let parts = args
                             .iter()
-                            .map(|a| format!("format!(\"{{}}\", {})", a))
+                            .map(|a| format!("format!(\"{{}}\", {})", self.emit_expr(a)))
                             .collect::<Vec<_>>()
                             .join(", ");
                         format!("luma_run(&[{}])", parts)
                     }
-                    "env" => format!("luma_env(&{})", arg_exprs[0]),
+                    "env" => format!("luma_env(&{})", self.emit_expr(&args[0])),
                     "home" => "luma_home()".to_string(),
                     _ => {
                         // user-defined function
-                        format!("luma_fn_{}({})", name, arg_exprs.join(", "))
+                        format!("luma_fn_{}({})", name, args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
                     }
                 }
             }
