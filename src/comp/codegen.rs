@@ -672,33 +672,84 @@ impl Codegen {
                 )
             }
 
-            ExprKind::BinaryOp { left, op, right } => {
-                match op {
-                    BinaryOp::Add => format!("luma_add({}, {})", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Subtract => format!("luma_subtract({}, {})", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Multiply => format!("luma_multiply({}, {})", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Divide => format!("luma_divide({}, {})", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Modulo => format!("luma_modulo({}, {})", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Equal => format!("luma_compare(&{}, &{}, \"==\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::NotEqual => format!("luma_compare(&{}, &{}, \"!=\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Greater => format!("luma_compare(&{}, &{}, \">\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::Less => format!("luma_compare(&{}, &{}, \"<\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::GreaterEqual => format!("luma_compare(&{}, &{}, \">=\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::LessEqual => format!("luma_compare(&{}, &{}, \"<=\")", self.emit_expr(left), self.emit_expr(right)),
-                    BinaryOp::And => format!(
-                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }} }}",
-                        self.emit_expr(left), self.emit_expr(right), self.current_file
-                    ),
-                    BinaryOp::Or => format!(
-                        "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }} }}",
-                        self.emit_expr(left), self.emit_expr(right), self.current_file
-                    ),
-                }
-            }
+            ExprKind::BinaryOp { left, op, right } => match op {
+                BinaryOp::Add => format!(
+                    "luma_add({}, {})",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Subtract => format!(
+                    "luma_subtract({}, {})",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Multiply => format!(
+                    "luma_multiply({}, {})",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Divide => format!(
+                    "luma_divide({}, {})",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Modulo => format!(
+                    "luma_modulo({}, {})",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Equal => format!(
+                    "luma_compare(&{}, &{}, \"==\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::NotEqual => format!(
+                    "luma_compare(&{}, &{}, \"!=\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Greater => format!(
+                    "luma_compare(&{}, &{}, \">\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::Less => format!(
+                    "luma_compare(&{}, &{}, \"<\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::GreaterEqual => format!(
+                    "luma_compare(&{}, &{}, \">=\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::LessEqual => format!(
+                    "luma_compare(&{}, &{}, \"<=\")",
+                    self.emit_expr(left),
+                    self.emit_expr(right)
+                ),
+                BinaryOp::And => format!(
+                    "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }} }}",
+                    self.emit_expr(left),
+                    self.emit_expr(right),
+                    self.current_file
+                ),
+                BinaryOp::Or => format!(
+                    "{{ if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }} }}",
+                    self.emit_expr(left),
+                    self.emit_expr(right),
+                    self.current_file
+                ),
+            },
 
             ExprKind::Assign { name, value } => {
                 self.mutated_vars.insert(name.clone());
-                format!("{{ {} = {}; {}.clone() }}", name, self.emit_expr(value), name)
+                format!(
+                    "{{ {} = {}; {}.clone() }}",
+                    name,
+                    self.emit_expr(value),
+                    name
+                )
             }
 
             ExprKind::AssignOp { name, op, value } => {
@@ -711,7 +762,11 @@ impl Codegen {
                 self.mutated_vars.insert(name.clone());
                 format!(
                     "{{ {} = {}({}.clone(), {}); {}.clone() }}",
-                    name, op_fn, name, self.emit_expr(value), name
+                    name,
+                    op_fn,
+                    name,
+                    self.emit_expr(value),
+                    name
                 )
             }
 
@@ -719,15 +774,31 @@ impl Codegen {
                 match name.as_str() {
                     "print" => {
                         // handled as Stmt::Print but may appear as expr
-                        format!("{{ luma_print(&{}); Value::Void }}", args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
+                        format!(
+                            "{{ luma_print(&{}); Value::Void }}",
+                            args.iter()
+                                .map(|a| self.emit_expr(a))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     }
                     "write" => {
-                        format!("{{ luma_write(&{}); Value::Void }}", args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
+                        format!(
+                            "{{ luma_write(&{}); Value::Void }}",
+                            args.iter()
+                                .map(|a| self.emit_expr(a))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     }
                     "read" => "luma_read()".to_string(),
                     "read_n" => format!("luma_read_n(&{})", self.emit_expr(&args[0])),
                     "random" => {
-                        format!("luma_random(&{}, &{})", self.emit_expr(&args[0]), self.emit_expr(&args[1]))
+                        format!(
+                            "luma_random(&{}, &{})",
+                            self.emit_expr(&args[0]),
+                            self.emit_expr(&args[1])
+                        )
                     }
                     "int" => format!("luma_int(&{})", self.emit_expr(&args[0])),
                     "float" => format!("luma_float(&{})", self.emit_expr(&args[0])),
@@ -785,7 +856,14 @@ impl Codegen {
                     "home" => "luma_home()".to_string(),
                     _ => {
                         // user-defined function
-                        format!("luma_fn_{}({})", name, args.iter().map(|a| self.emit_expr(a)).collect::<Vec<_>>().join(", "))
+                        format!(
+                            "luma_fn_{}({})",
+                            name,
+                            args.iter()
+                                .map(|a| self.emit_expr(a))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     }
                 }
             }
