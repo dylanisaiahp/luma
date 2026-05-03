@@ -154,6 +154,15 @@ pub fn luma_home() -> Value {
     Value::String(std::env::var("HOME").unwrap_or_default())
 }
 
+pub fn luma_time() -> Value {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let ms = duration.as_secs() * 1000 + duration.subsec_millis() as u64;
+    Value::Integer(ms as i64)
+}
+
 pub fn luma_random(min: &Value, max: &Value) -> Value {
     use std::time::{SystemTime, UNIX_EPOCH};
     match (min, max) {
