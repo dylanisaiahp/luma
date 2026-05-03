@@ -890,7 +890,7 @@ fn maybe_method(
             Some(v) => luma_method_with_location(*v, method, args.to_vec(), file, line, col),
             None => {
                 if method == "add" || method == "push" {
-                    list_method_with_location(vec![], method, args, file, line, col)
+                    list_method_with_location(vec![], method, args.to_vec(), file, line, col)
                 } else if method == "len" {
                     Value::Integer(0)
                 } else if method == "get" {
