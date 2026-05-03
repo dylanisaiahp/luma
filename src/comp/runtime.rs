@@ -808,6 +808,20 @@ fn string_method(
 
             Value::String(result)
         }
+        "hash" => {
+            // FNV-1a hash (fast, non-cryptographic)
+            const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+            const FNV_PRIME: u64 = 0x00000100000001b3;
+            
+            let mut hash = FNV_OFFSET_BASIS;
+            for byte in s.bytes() {
+                hash ^= byte as u64;
+                hash = hash.wrapping_mul(FNV_PRIME);
+            }
+            
+            // Return as hex string
+            format!("{:x}", hash)
+        }
         _ => runtime_error_with_location(
             &format!("string has no method '{}'", method),
             file,
