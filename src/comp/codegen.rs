@@ -854,6 +854,7 @@ impl Codegen {
                     }
                     "env" => format!("luma_env(&{})", self.emit_expr(&args[0])),
                     "home" => "luma_home()".to_string(),
+                    "time" => "luma_time()".to_string(),
                     _ => {
                         // user-defined function
                         format!(

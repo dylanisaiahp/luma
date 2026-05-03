@@ -488,8 +488,8 @@ pub fn luma_method_with_location(
             line,
             col,
         ),
-        Value::JsonHandle(s) => luma_json_method(s, method, &args),
-        Value::TomlHandle(s) => luma_toml_method(s, method, &args),
+        Value::JsonHandle(s) => luma_json_method(&s, method, &args),
+        Value::TomlHandle(s) => luma_toml_method(&s, method, &args),
     }
 }
 
