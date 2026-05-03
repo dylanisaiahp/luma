@@ -820,7 +820,7 @@ fn string_method(
             }
             
             // Return as hex string
-            format!("{:x}", hash)
+            Value::String(format!("{:x}", hash))
         }
         _ => runtime_error_with_location(
             &format!("string has no method '{}'", method),
