@@ -1,33 +1,17 @@
 // src/debug/interpreter.rs
 use crate::debug::format::{self, interpreter_tag, level_tag};
-use crate::interpreter::value::Value;
 
 pub struct InterpreterDebug {
     pub events: Vec<DebugEvent>,
 }
 
 pub enum DebugEvent {
-    MethodCall {
-        object: String,
-        method: String,
-        result: String,
-    },
-    Print {
-        value: String,
-    },
+    Print { value: String },
 }
 
 impl InterpreterDebug {
     pub fn new() -> Self {
         Self { events: Vec::new() }
-    }
-
-    pub fn log_method_call(&mut self, object: &Value, method: &str, result: &Value) {
-        self.events.push(DebugEvent::MethodCall {
-            object: format_value(object),
-            method: method.to_string(),
-            result: format_value(result),
-        });
     }
 
     pub fn log_print(&mut self, value: &str) {
@@ -47,13 +31,6 @@ impl InterpreterDebug {
         for (i, event) in self.events.iter().enumerate() {
             let is_last = i == len - 1;
             let line = match event {
-                DebugEvent::MethodCall {
-                    object,
-                    method,
-                    result,
-                } => {
-                    format!("{}.{}() → {}", object, method, result)
-                }
                 DebugEvent::Print { value } => {
                     format!("printed: {}", value)
                 }
@@ -75,33 +52,5 @@ impl InterpreterDebug {
 impl Default for InterpreterDebug {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-fn format_value(val: &Value) -> String {
-    match val {
-        Value::Integer(n) => n.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::String(s) => format!("\"{}\"", s),
-        Value::Char(c) => format!("'{}'", c),
-        Value::Boolean(b) => b.to_string(),
-        Value::Void => "void".to_string(),
-        Value::Option(Some(inner)) => format!("Option({})", format_value(inner)),
-        Value::Option(None) => "Option(none)".to_string(),
-        Value::List(items) => format!("List({})", items.len()),
-        Value::Table(pairs) => format!("Table({})", pairs.len()),
-        Value::FetchHandle(url) => format!("fetch(\"{}\")", url),
-        Value::FileHandle(path) => format!("file(\"{}\")", path),
-        Value::JsonHandle(s) => format!("json(\"{}\")", s),
-        Value::TomlHandle(s) => format!("toml(\"{}\")", s),
-        Value::Struct { name, fields } => format!("{}({} fields)", name, fields.len()),
-        Value::EnumVariant { enum_name, variant } => format!("{}::{}", enum_name, variant),
-        Value::EnumVariantData {
-            enum_name,
-            variant,
-            data,
-        } => {
-            format!("{}::{}({} values)", enum_name, variant, data.len())
-        }
     }
 }

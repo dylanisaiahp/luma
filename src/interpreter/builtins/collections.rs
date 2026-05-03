@@ -1,8 +1,9 @@
 // src/interpreter/builtins/collections.rs
 use crate::interpreter::value::{RuntimeError, Value};
 
-pub fn list_method(
-    items: &[Value],
+/// Owned version for interpreter path - avoids cloning the entire list
+pub fn list_method_owned(
+    mut items: Vec<Value>,
     method: &str,
     args: &[Value],
     line: usize,
@@ -63,7 +64,6 @@ pub fn list_method(
                 line,
                 column,
             })?;
-            let mut items = items.to_vec();
             items.push(val.clone());
             Ok(Value::List(items))
         }
@@ -78,7 +78,6 @@ pub fn list_method(
                         column,
                     });
                 }
-                let mut items = items.to_vec();
                 items.remove(idx);
                 Ok(Value::List(items))
             }
@@ -90,12 +89,10 @@ pub fn list_method(
             }),
         },
         "reverse" => {
-            let mut items = items.to_vec();
             items.reverse();
             Ok(Value::List(items))
         }
         "sort" => {
-            let mut items = items.to_vec();
             items.sort_by(|a, b| match (a, b) {
                 (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
                 (Value::Float(x), Value::Float(y)) => {
@@ -160,8 +157,9 @@ pub fn list_method(
     }
 }
 
-pub fn table_method(
-    pairs: &[(Value, Value)],
+/// Owned version for interpreter path - avoids cloning the entire table
+pub fn table_method_owned(
+    mut pairs: Vec<(Value, Value)>,
     method: &str,
     args: &[Value],
     line: usize,
@@ -205,16 +203,14 @@ pub fn table_method(
                     column,
                 });
             }
-            // For interpreter path, we must clone since we receive slices
             let key = args[0].clone();
             let val = args[1].clone();
-            let mut new_pairs = pairs.to_vec();
-            if let Some(entry) = new_pairs.iter_mut().find(|(k, _)| k == &key) {
+            if let Some(entry) = pairs.iter_mut().find(|(k, _)| k == &key) {
                 entry.1 = val;
             } else {
-                new_pairs.push((key, val));
+                pairs.push((key, val));
             }
-            Ok(Value::Table(new_pairs))
+            Ok(Value::Table(pairs))
         }
         "remove" => {
             let key = args.first().ok_or(RuntimeError {
@@ -223,9 +219,8 @@ pub fn table_method(
                 line,
                 column,
             })?;
-            let mut new_pairs = pairs.to_vec();
-            new_pairs.retain(|(k, _)| k != key);
-            Ok(Value::Table(new_pairs))
+            pairs.retain(|(k, _)| k != key);
+            Ok(Value::Table(pairs))
         }
         "keys" => Ok(Value::List(pairs.iter().map(|(k, _)| k.clone()).collect())),
         "values" => Ok(Value::List(pairs.iter().map(|(_, v)| v.clone()).collect())),

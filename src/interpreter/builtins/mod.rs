@@ -6,7 +6,7 @@ mod io;
 mod numeric;
 mod text;
 
-pub use collections::{list_method, table_method};
+pub use collections::{list_method_owned, table_method_owned};
 pub use convert::{eval_float, eval_int, eval_random, eval_string};
 pub use handles::{fetch_method, file_method, json_method, toml_method};
 pub use io::{
@@ -83,8 +83,8 @@ pub fn eval_method(
                 }),
             },
         },
-        Value::List(items) => list_method(&items, method, args, line, column),
-        Value::Table(pairs) => table_method(&pairs, method, args, line, column),
+        Value::List(items) => list_method_owned(items, method, args, line, column),
+        Value::Table(pairs) => table_method_owned(pairs, method, args, line, column),
         Value::FetchHandle(url) => fetch_method(&url, method, args, line, column),
         Value::FileHandle(path) => file_method(&path, method, args, line, column),
         Value::JsonHandle(json_str) => json_method(&json_str, method, args, line, column),

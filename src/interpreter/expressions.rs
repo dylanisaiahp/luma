@@ -268,14 +268,8 @@ impl Interpreter {
                 for arg in args {
                     arg_vals.push(self.evaluate_expression(arg)?);
                 }
-                let result = builtins::eval_method(
-                    object_val.clone(),
-                    method,
-                    &arg_vals,
-                    expr.line,
-                    expr.column,
-                )?;
-                self.debug.log_method_call(&object_val, method, &result);
+                let result =
+                    builtins::eval_method(object_val, method, &arg_vals, expr.line, expr.column)?;
                 Ok(result)
             }
         }
