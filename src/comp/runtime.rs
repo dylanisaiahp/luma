@@ -452,17 +452,15 @@ pub fn luma_method_with_location(
     line: u32,
     col: u32,
 ) -> Value {
-    match &object {
-        Value::Integer(n) => int_method(*n, method, &args, file, line, col),
-        Value::Float(f) => float_method(*f, method, &args, file, line, col),
-        Value::String(s) => string_method(s.clone(), method, &args, file, line, col),
-        Value::Char(c) => char_method(*c, method, &args, file, line, col),
-        Value::Boolean(b) => bool_method(*b, method, file, line, col),
-        Value::Option(inner) => maybe_method(inner.clone(), method, &args, file, line, col),
-        Value::List(items) => {
-            list_method_with_location(items.clone(), method, &args, file, line, col)
-        }
-        Value::Table(pairs) => table_method(pairs.clone(), method, &args, file, line, col),
+    match object {
+        Value::Integer(n) => int_method(n, method, &args, file, line, col),
+        Value::Float(f) => float_method(f, method, &args, file, line, col),
+        Value::String(s) => string_method(s, method, &args, file, line, col),
+        Value::Char(c) => char_method(c, method, &args, file, line, col),
+        Value::Boolean(b) => bool_method(b, method, file, line, col),
+        Value::Option(inner) => maybe_method(inner, method, &args, file, line, col),
+        Value::List(items) => list_method_with_location(items, method, args, file, line, col),
+        Value::Table(pairs) => table_method(pairs, method, args, file, line, col),
         Value::EnumVariant { .. } => runtime_error_with_location(
             &format!("{} has no method '{}'", object.type_name(), method),
             file,
@@ -482,8 +480,8 @@ pub fn luma_method_with_location(
             col,
         ),
         Value::Struct { name, fields } => struct_method_with_location(
-            name.clone(),
-            fields.clone(),
+            name,
+            fields,
             method,
             &args,
             file,
@@ -498,7 +496,7 @@ pub fn luma_method_with_location(
 fn list_method_with_location(
     items: Vec<Value>,
     method: &str,
-    args: &[Value],
+    args: Vec<Value>,
     file: &str,
     line: u32,
     col: u32,
@@ -540,35 +538,38 @@ fn list_method_with_location(
             _ => runtime_error_with_location("list.where() takes one argument", file, line, col),
         },
         "add" => {
-            let val = args.first().unwrap_or_else(|| {
+            let val = args.into_iter().next().unwrap_or_else(|| {
                 runtime_error_with_location("list.add() takes one argument", file, line, col)
             });
             let mut new_items = items;
-            new_items.push(val.clone());
+            new_items.push(val);
             Value::List(new_items)
         }
-        "remove" => match args.first() {
-            Some(Value::Integer(i)) => {
-                let idx = *i as usize;
-                if idx >= items.len() {
-                    runtime_error_with_location(
-                        &format!("list index {} out of bounds (len {})", i, items.len()),
-                        file,
-                        line,
-                        col,
-                    );
+        "remove" => {
+            let first_arg = args.into_iter().next();
+            match first_arg {
+                Some(Value::Integer(i)) => {
+                    let idx = i as usize;
+                    if idx >= items.len() {
+                        runtime_error_with_location(
+                            &format!("list index {} out of bounds (len {})", i, items.len()),
+                            file,
+                            line,
+                            col,
+                        );
+                    }
+                    let mut new_items = items;
+                    new_items.remove(idx);
+                    Value::List(new_items)
                 }
-                let mut new_items = items;
-                new_items.remove(idx);
-                Value::List(new_items)
+                _ => runtime_error_with_location(
+                    "list.remove() takes one integer index argument",
+                    file,
+                    line,
+                    col,
+                ),
             }
-            _ => runtime_error_with_location(
-                "list.remove() takes one integer index argument",
-                file,
-                line,
-                col,
-            ),
-        },
+        }
         "reverse" => {
             let mut new_items = items;
             new_items.reverse();
@@ -599,8 +600,9 @@ fn list_method_with_location(
             }
         },
         "merge" => {
-            let glue = match args.first() {
-                Some(Value::String(s)) => s.clone(),
+            let first_arg = args.into_iter().next();
+            let glue = match first_arg {
+                Some(Value::String(s)) => s,
                 Some(Value::Char(c)) => c.to_string(),
                 None => String::new(),
                 _ => runtime_error_with_location(
@@ -913,7 +915,7 @@ fn maybe_method(
 fn table_method(
     pairs: Vec<(Value, Value)>,
     method: &str,
-    args: &[Value],
+    args: Vec<Value>,
     file: &str,
     line: u32,
     col: u32,
@@ -945,8 +947,9 @@ fn table_method(
                     col,
                 );
             }
-            let key = args[0].clone();
-            let val = args[1].clone();
+            let mut args_iter = args.into_iter();
+            let key = args_iter.next().unwrap();
+            let val = args_iter.next().unwrap();
             let mut new_pairs = pairs;
             if let Some(entry) = new_pairs.iter_mut().find(|(k, _)| k == &key) {
                 entry.1 = val;
@@ -956,11 +959,11 @@ fn table_method(
             Value::Table(new_pairs)
         }
         "remove" => {
-            let key = args.first().unwrap_or_else(|| {
+            let key = args.into_iter().next().unwrap_or_else(|| {
                 runtime_error_with_location("table.remove() takes one argument", file, line, col)
             });
             let mut new_pairs = pairs;
-            new_pairs.retain(|(k, _)| k != key);
+            new_pairs.retain(|(k, _)| k != &key);
             Value::Table(new_pairs)
         }
         "keys" => Value::List(pairs.iter().map(|(k, _)| k.clone()).collect()),

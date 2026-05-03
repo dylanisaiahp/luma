@@ -63,9 +63,9 @@ pub fn list_method(
                 line,
                 column,
             })?;
-            let mut new_items = items.to_vec();
-            new_items.push(val.clone());
-            Ok(Value::List(new_items))
+            let mut items = items.to_vec();
+            items.push(val.clone());
+            Ok(Value::List(items))
         }
         "remove" => match args.first() {
             Some(Value::Integer(i)) => {
@@ -78,9 +78,9 @@ pub fn list_method(
                         column,
                     });
                 }
-                let mut new_items = items.to_vec();
-                new_items.remove(idx);
-                Ok(Value::List(new_items))
+                let mut items = items.to_vec();
+                items.remove(idx);
+                Ok(Value::List(items))
             }
             _ => Err(RuntimeError {
                 message: "list.remove() takes one integer index argument".to_string(),
@@ -90,13 +90,13 @@ pub fn list_method(
             }),
         },
         "reverse" => {
-            let mut new_items = items.to_vec();
-            new_items.reverse();
-            Ok(Value::List(new_items))
+            let mut items = items.to_vec();
+            items.reverse();
+            Ok(Value::List(items))
         }
         "sort" => {
-            let mut new_items = items.to_vec();
-            new_items.sort_by(|a, b| match (a, b) {
+            let mut items = items.to_vec();
+            items.sort_by(|a, b| match (a, b) {
                 (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
                 (Value::Float(x), Value::Float(y)) => {
                     x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
@@ -104,7 +104,7 @@ pub fn list_method(
                 (Value::String(x), Value::String(y)) => x.cmp(y),
                 _ => std::cmp::Ordering::Equal,
             });
-            Ok(Value::List(new_items))
+            Ok(Value::List(items))
         }
         "first" => match items.first() {
             Some(v) => Ok(v.clone()),
@@ -205,6 +205,7 @@ pub fn table_method(
                     column,
                 });
             }
+            // For interpreter path, we must clone since we receive slices
             let key = args[0].clone();
             let val = args[1].clone();
             let mut new_pairs = pairs.to_vec();

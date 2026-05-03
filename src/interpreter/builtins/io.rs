@@ -416,7 +416,34 @@ pub fn eval_run(
         });
     }
 
-    // Evaluate all args as strings and join into a command
+    // Check if single list(string) argument is passed
+    if args.len() == 1 {
+        let val = interpreter.evaluate_expression(&args[0])?;
+        if let Value::List(items) = &val {
+            // Extract strings from list - first is command, rest are args
+            let parts: Vec<String> = items
+                .iter()
+                .map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    other => interpreter.value_to_display_string(other),
+                })
+                .collect();
+
+            if parts.is_empty() {
+                return Err(RuntimeError {
+                    message: "run() command list cannot be empty".to_string(),
+                    file_path: String::new(),
+                    line,
+                    column,
+                });
+            }
+
+            let (cmd, cmd_args) = parts.split_first().unwrap();
+            return execute_command(cmd, cmd_args, line, column);
+        }
+    }
+
+    // Evaluate all args as strings and join into a command (variadic behavior)
     let mut parts: Vec<String> = Vec::new();
     for arg in args {
         let val = interpreter.evaluate_expression(arg)?;
@@ -441,7 +468,18 @@ pub fn eval_run(
         }
     };
 
-    match std::process::Command::new(&cmd).args(&cmd_args).output() {
+    execute_command(&cmd, &cmd_args, line, column)
+}
+
+fn execute_command(
+    cmd: &str,
+    cmd_args: &[String],
+    line: usize,
+    column: usize,
+) -> Result<crate::interpreter::value::Value, crate::interpreter::value::RuntimeError> {
+    use crate::interpreter::value::{RuntimeError, Value};
+
+    match std::process::Command::new(cmd).args(cmd_args).output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

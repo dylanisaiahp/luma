@@ -25,8 +25,8 @@ pub fn eval_method(
     line: usize,
     column: usize,
 ) -> Result<Value, RuntimeError> {
-    match &object {
-        Value::Integer(n) => match int_method(n, method, args, line, column) {
+    match object {
+        Value::Integer(n) => match int_method(&n, method, args, line, column) {
             Some(result) => result,
             None => Err(RuntimeError {
                 message: format!("int has no method '{}'", method),
@@ -35,7 +35,7 @@ pub fn eval_method(
                 column,
             }),
         },
-        Value::Float(f) => match float_method(f, method, args, line, column) {
+        Value::Float(f) => match float_method(&f, method, args, line, column) {
             Some(result) => result,
             None => Err(RuntimeError {
                 message: format!("float has no method '{}'", method),
@@ -44,11 +44,11 @@ pub fn eval_method(
                 column,
             }),
         },
-        Value::String(s) => string_method(s, method, args, line, column),
-        Value::Char(c) => char_method(c, method, args, line, column),
+        Value::String(s) => string_method(&s, method, args, line, column),
+        Value::Char(c) => char_method(&c, method, args, line, column),
         Value::Boolean(b) => match method {
             "to_string" => Ok(Value::String(b.to_string())),
-            "exists" => Ok(Value::Boolean(*b)),
+            "exists" => Ok(Value::Boolean(b)),
             _ => Err(RuntimeError {
                 message: format!("bool has no method '{}'", method),
                 file_path: String::new(),
@@ -59,10 +59,7 @@ pub fn eval_method(
         Value::Option(inner) => match method {
             "exists" => Ok(Value::Boolean(inner.is_some())),
             "or" => match inner {
-                Some(inner) => {
-                    let result = (*inner.clone()).clone();
-                    Ok(result)
-                }
+                Some(inner) => Ok(*inner),
                 None => match args.first() {
                     Some(v) => Ok(v.clone()),
                     None => Err(RuntimeError {
@@ -74,7 +71,7 @@ pub fn eval_method(
                 },
             },
             _ => match inner {
-                Some(inner) => eval_method(*inner.clone(), method, args, line, column),
+                Some(inner) => eval_method(*inner, method, args, line, column),
                 None => Err(RuntimeError {
                     message: format!(
                         "Cannot call '{}' on empty option — use .or() to provide a fallback first",
@@ -86,13 +83,12 @@ pub fn eval_method(
                 }),
             },
         },
-        Value::List(items) => list_method(items, method, args, line, column),
-        Value::Table(pairs) => table_method(pairs, method, args, line, column),
-        Value::FetchHandle(url) => fetch_method(url, method, args, line, column),
-
-        Value::FileHandle(path) => file_method(path, method, args, line, column),
-        Value::JsonHandle(json_str) => json_method(json_str, method, args, line, column),
-        Value::TomlHandle(toml_str) => toml_method(toml_str, method, args, line, column),
+        Value::List(items) => list_method(&items, method, args, line, column),
+        Value::Table(pairs) => table_method(&pairs, method, args, line, column),
+        Value::FetchHandle(url) => fetch_method(&url, method, args, line, column),
+        Value::FileHandle(path) => file_method(&path, method, args, line, column),
+        Value::JsonHandle(json_str) => json_method(&json_str, method, args, line, column),
+        Value::TomlHandle(toml_str) => toml_method(&toml_str, method, args, line, column),
         Value::Struct { name, .. } => Err(RuntimeError {
             message: format!(
                 "struct '{}' has no builtin methods — use defined methods instead",
