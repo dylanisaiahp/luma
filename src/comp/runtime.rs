@@ -775,6 +775,39 @@ fn string_method(
             },
             _ => runtime_error_with_location("as() takes a type argument", file, line, col),
         },
+        "concat" => {
+            // Calculate total length needed for single allocation
+            let mut total_len = s.len();
+            for arg in args {
+                match arg {
+                    Value::String(a) => total_len += a.len(),
+                    Value::Char(c) => total_len += c.len_utf8(),
+                    _ => {
+                        return runtime_error_with_location(
+                            "concat() takes only string or char arguments",
+                            file,
+                            line,
+                            col,
+                        )
+                    }
+                }
+            }
+
+            // Allocate once with exact capacity
+            let mut result = String::with_capacity(total_len);
+            result.push_str(&s);
+
+            // Copy all parts in a single pass
+            for arg in args {
+                match arg {
+                    Value::String(a) => result.push_str(a),
+                    Value::Char(c) => result.push(*c),
+                    _ => unreachable!(), // Already checked above
+                }
+            }
+
+            Value::String(result)
+        }
         _ => runtime_error_with_location(
             &format!("string has no method '{}'", method),
             file,
