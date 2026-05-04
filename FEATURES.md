@@ -45,7 +45,7 @@ A quick reference for all builtin functions, methods, and types supported by Lum
 | `first(char)` | Returns `option(char)` of first char | 0-1 (char type hint) |
 | `last(char)` | Returns `option(char)` of last char | 0-1 (char type hint) |
 | `as(type)` | Converts to int/float/bool/char/string | 1 (string: "int", "float", etc.) |
-| `concat(sep)` | Concatenates list of strings with separator | 1 (string) |
+| `concat(...)` | Concatenates all arguments onto string (variadic) | Variadic (strings/chars) |
 | `hash()` | Returns FNV-1a hash as hex string | 0 |
 
 ## List Methods
@@ -140,7 +140,7 @@ A quick reference for all builtin functions, methods, and types supported by Lum
 
 - `struct` methods - Must be defined in the same file as struct definition
 - `enum` methods - No builtin methods, use defined methods instead
-- Large `list(string)` passed to `run()` - Verified working up to 82 elements, but see build system notes
+- Large `list(string)` passed to `run()` - Verified working up to 82 elements (echo test); actual clang build failure cause unknown
 - `random()` - Uses time-based seed, not cryptographically secure
 - `fetch()` - Synchronous only, no async support
 - File paths - Must be absolute or relative to current working directory
