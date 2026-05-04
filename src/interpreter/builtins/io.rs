@@ -421,13 +421,22 @@ pub fn eval_run(
         let val = interpreter.evaluate_expression(&args[0])?;
         if let Value::List(items) = &val {
             // Extract strings from list - first is command, rest are args
+            // Error if any element is not a Value::String
             let parts: Vec<String> = items
                 .iter()
                 .map(|v| match v {
-                    Value::String(s) => s.clone(),
-                    other => interpreter.value_to_display_string(other),
+                    Value::String(s) => Ok(s.clone()),
+                    other => Err(RuntimeError {
+                        message: format!(
+                            "run() list must contain only strings, found: {}",
+                            interpreter.value_to_display_string(other)
+                        ),
+                        file_path: String::new(),
+                        line,
+                        column,
+                    }),
                 })
-                .collect();
+                .collect::<Result<_, _>>()?;
 
             if parts.is_empty() {
                 return Err(RuntimeError {
@@ -452,7 +461,17 @@ pub fn eval_run(
                 // Split on whitespace so run("git status") works naturally
                 parts.extend(s.split_whitespace().map(|s| s.to_string()));
             }
-            other => parts.push(interpreter.value_to_display_string(&other)),
+            other => {
+                return Err(RuntimeError {
+                    message: format!(
+                        "run() arguments must be strings, found: {}",
+                        interpreter.value_to_display_string(&other)
+                    ),
+                    file_path: String::new(),
+                    line,
+                    column,
+                });
+            }
         }
     }
 
@@ -479,7 +498,10 @@ fn execute_command(
 ) -> Result<crate::interpreter::value::Value, crate::interpreter::value::RuntimeError> {
     use crate::interpreter::value::{RuntimeError, Value};
 
-    match std::process::Command::new(cmd).args(cmd_args).output() {
+    let cmd = cmd.trim();
+    let cmd_args: Vec<String> = cmd_args.iter().map(|s| s.trim().to_string()).collect();
+
+    match std::process::Command::new(cmd).args(&cmd_args).output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

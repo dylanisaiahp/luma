@@ -160,7 +160,10 @@ pub fn file_method(
                 column,
             })?;
             let modified = metadata.modified().map_err(|e| RuntimeError {
-                message: format!("file(\"{}\").age() failed to get modification time: {}", path, e),
+                message: format!(
+                    "file(\"{}\").age() failed to get modification time: {}",
+                    path, e
+                ),
                 file_path: String::new(),
                 line,
                 column,

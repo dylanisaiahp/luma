@@ -186,7 +186,9 @@ pub fn luma_run(parts: &[String]) -> Value {
         Some(x) => x,
         None => runtime_error("run() command cannot be empty"),
     };
-    match std::process::Command::new(cmd).args(args).output() {
+    let cmd = cmd.trim();
+    let args: Vec<String> = args.iter().map(|s| s.trim().to_string()).collect();
+    match std::process::Command::new(cmd).args(&args).output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

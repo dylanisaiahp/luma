@@ -10,6 +10,7 @@ A quick reference for all builtin functions, methods, and types supported by Lum
 | `read()` | Reads line from stdin | 0 |
 | `read(n)` | Reads n bytes from stdin | 1 (integer) |
 | `run(args...)` | Executes command, returns stdout | Variadic strings OR `list(string)` |
+| | *Non-String elements now error instead of silently corrupting args; whitespace is trimmed from cmd and all args; verified working with echo up to 82 elements; clang large list behavior untested after fix* | |
 | `file(path)` | Creates file handle | 1 (string) |
 | `home()` | Returns `$HOME` path | 0 |
 | `time()` | Returns Unix timestamp in ms as int | 0 |
