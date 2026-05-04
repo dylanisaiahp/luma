@@ -152,6 +152,25 @@ pub fn file_method(
             }
         }
         "exists" => Ok(Value::Boolean(std::path::Path::new(path).exists())),
+        "age" => {
+            let metadata = std::fs::metadata(path).map_err(|e| RuntimeError {
+                message: format!("file(\"{}\").age() failed: {}", path, e),
+                file_path: String::new(),
+                line,
+                column,
+            })?;
+            let modified = metadata.modified().map_err(|e| RuntimeError {
+                message: format!("file(\"{}\").age() failed to get modification time: {}", path, e),
+                file_path: String::new(),
+                line,
+                column,
+            })?;
+            let duration = modified
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let ms = duration.as_secs() * 1000 + duration.subsec_millis() as u64;
+            Ok(Value::Integer(ms as i64))
+        }
         "list" => {
             let filter = match args.first() {
                 Some(Value::String(s)) => s.clone(),
