@@ -138,7 +138,6 @@ A quick reference for all builtin functions, methods, and types supported by Lum
 
 ## Known Limitations
 
-- `mtime()`/`age()` - Not yet implemented
 - `struct` methods - Must be defined in the same file as struct definition
 - `enum` methods - No builtin methods, use defined methods instead
 - Large `list(string)` passed to `run()` - Verified working up to 82 elements, but see build system notes
