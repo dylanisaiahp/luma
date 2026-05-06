@@ -14,7 +14,6 @@ A quick reference for all builtin functions, methods, and types supported by Lum
 | `file(path)` | Creates file handle | 1 (string) |
 | `home()` | Returns `$HOME` path | 0 |
 | `time()` | Returns Unix timestamp in ms as int | 0 |
-| `input(msg)` | Prompts user with msg, returns input | 1 (string) |
 | `json(val)` | Creates JSON handle from string/table | 1 (string or table) |
 | `toml(val)` | Creates TOML handle from string/table | 1 (string or table) |
 | `string(val)` | Converts value to string | 1 |

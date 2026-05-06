@@ -1,5 +1,6 @@
 // src/comp/codegen.rs
 use crate::ast::*;
+use crate::interpreter::StructDef;
 use crate::syntax::BinaryOp;
 
 pub struct Codegen {
@@ -9,6 +10,7 @@ pub struct Codegen {
     current_return_type: String,
     current_file: String,
     struct_methods: Vec<(String, String)>,
+    struct_defs: std::collections::HashMap<String, StructDef>,
     emitted_functions: std::collections::HashSet<String>,
     mutated_vars: std::collections::HashSet<String>,
     expected_type: Option<String>,
@@ -29,6 +31,7 @@ impl Codegen {
             current_return_type: "void".to_string(),
             current_file: String::new(),
             struct_methods: Vec::new(),
+            struct_defs: std::collections::HashMap::new(),
             emitted_functions: std::collections::HashSet::new(),
             mutated_vars: std::collections::HashSet::new(),
             expected_type: None,
@@ -299,6 +302,15 @@ impl Codegen {
                 fields,
                 methods,
             } => {
+                // Store struct def for field type lookup during codegen
+                self.struct_defs.insert(
+                    name.clone(),
+                    StructDef {
+                        fields: fields.clone(),
+                        methods: methods.clone(),
+                    },
+                );
+
                 for method in methods {
                     let ret = if method.return_type == "void" {
                         String::new()
@@ -995,7 +1007,15 @@ impl Codegen {
                 // For now, generate efficient struct construction
                 let mut field_inserts = String::new();
                 for (fname, fexpr) in fields {
+                    // Look up field type from struct def to set expected_type for empty coercion
+                    let field_type = self
+                        .struct_defs
+                        .get(name)
+                        .and_then(|def| def.fields.iter().find(|f| &f.name == fname))
+                        .map(|f| f.type_name.clone());
+                    self.expected_type = field_type;
                     let v = self.emit_expr(fexpr);
+                    self.expected_type = None;
                     field_inserts.push_str(&format!(
                         "_fields.insert(\"{}\".to_string(), {});\n",
                         fname, v
