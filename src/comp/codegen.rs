@@ -173,7 +173,7 @@ impl Codegen {
 
     pub fn generate(mut self, stmts: &[Stmt]) -> String {
         // File header
-        self.emit_line("#![allow(unused_mut, unused_variables, unused_must_use)]");
+        self.emit_line("#![allow(dead_code, unused_mut, unused_variables, unused_must_use)]");
         self.emit_line("mod luma_runtime;");
         self.emit_line("use luma_runtime::*;");
         self.emit_line("");
