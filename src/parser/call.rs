@@ -67,6 +67,7 @@ impl Parser {
                         self.expect_token(TokenKind::RParen)?;
 
                         expr = Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::StructInstantiate {
                                 name: struct_name,
                                 fields,
@@ -95,6 +96,7 @@ impl Parser {
                         match expr.kind {
                             ExprKind::Identifier(name) => {
                                 expr = Expr {
+                                    file_path: self.current_file.clone(),
                                     kind: ExprKind::Call { name, args },
                                     line: token.line,
                                     column: token.column,
@@ -102,6 +104,7 @@ impl Parser {
                             }
                             ExprKind::EnumVariant { enum_name, variant } => {
                                 expr = Expr {
+                                    file_path: self.current_file.clone(),
                                     kind: ExprKind::EnumVariantData {
                                         enum_name,
                                         variant,
@@ -167,6 +170,7 @@ impl Parser {
                                     let t = self.current_token().cloned().unwrap();
                                     self.advance();
                                     args.push(Expr {
+                                        file_path: self.current_file.clone(),
                                         kind: ExprKind::String(type_name),
                                         line: t.line,
                                         column: t.column,
@@ -213,6 +217,7 @@ impl Parser {
                                 }
                             };
                             expr = Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::EnumVariantData {
                                     enum_name,
                                     variant: member,
@@ -223,6 +228,7 @@ impl Parser {
                             };
                         } else {
                             expr = Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::MethodCall {
                                     object: Box::new(expr),
                                     method: member,
@@ -254,6 +260,7 @@ impl Parser {
                                 }
                             };
                             expr = Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::EnumVariant {
                                     enum_name,
                                     variant: member,
@@ -263,6 +270,7 @@ impl Parser {
                             };
                         } else {
                             expr = Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::FieldAccess {
                                     object: Box::new(expr),
                                     field: member,

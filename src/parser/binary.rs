@@ -48,6 +48,7 @@ impl Parser {
             let right = self.parse_binary_expression(precedence + 1)?;
 
             left = Expr {
+                file_path: self.current_file.clone(),
                 kind: ExprKind::BinaryOp {
                     left: Box::new(left),
                     op,

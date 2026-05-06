@@ -416,7 +416,7 @@ fn load_with_uses_grouped(
         collector.add_lexer_error(error);
     }
 
-    let mut parser = crate::parser::Parser::new(tokens);
+    let mut parser = crate::parser::Parser::new(tokens, file_path);
     let statements = parser.parse_program();
     let parse_errors = parser.take_errors();
 
@@ -528,7 +528,7 @@ fn load_with_uses(
         collector.add_lexer_error(error);
     }
 
-    let mut parser = crate::parser::Parser::new(tokens);
+    let mut parser = crate::parser::Parser::new(tokens, file_path);
     let statements = parser.parse_program();
     let parse_errors = parser.take_errors();
 
@@ -818,7 +818,7 @@ fn check_file(file: &str) -> anyhow::Result<()> {
         collector.add_lexer_error(error);
     }
 
-    let mut parser = crate::parser::Parser::new(tokens);
+    let mut parser = crate::parser::Parser::new(tokens, file);
     let _statements = parser.parse_program();
     let errors = parser.take_errors();
     for error in errors {

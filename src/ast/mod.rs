@@ -5,6 +5,7 @@ pub struct Expr {
     pub kind: ExprKind,
     pub line: usize,
     pub column: usize,
+    pub file_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

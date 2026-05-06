@@ -26,6 +26,7 @@ impl Parser {
                         self.advance();
                         let value = self.parse_assignment_expression(0)?;
                         return Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::AssignOp {
                                 name: name.clone(),
                                 op,
@@ -53,6 +54,7 @@ impl Parser {
                         self.advance();
                         let value = self.parse_assignment_expression(0)?;
                         return Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Assign {
                                 name: name.clone(),
                                 value: Box::new(value),

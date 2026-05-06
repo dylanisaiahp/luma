@@ -171,7 +171,8 @@ impl Codegen {
         }
     }
 
-    pub fn generate(mut self, stmts: &[Stmt]) -> String {
+    pub fn generate(mut self, stmts: &[Stmt], file: &str) -> String {
+        self.current_file = file.to_string();
         // File header
         self.emit_line("#![allow(dead_code, unused_mut, unused_variables, unused_must_use, unused_assignments, unused_parens, unused_braces)]");
         self.emit_line("mod luma_runtime;");
@@ -637,7 +638,13 @@ impl Codegen {
     // --- Expressions ---
 
     fn emit_expr(&mut self, expr: &Expr) -> String {
-        match &expr.kind {
+        // Use expr's file path for error reporting
+        let old_file = self.current_file.clone();
+        if !expr.file_path.is_empty() {
+            self.current_file = expr.file_path.clone();
+        }
+
+        let result = match &expr.kind {
             ExprKind::Integer(n) => format!("Value::Integer({})", n),
             ExprKind::Float(f) => format!("Value::Float({}f64)", f),
             ExprKind::Boolean(b) => format!("Value::Boolean({})", b),
@@ -1077,6 +1084,10 @@ impl Codegen {
                     type_name, constant, type_name, constant, self.current_file
                 ),
             },
-        }
+        };
+
+        // Restore original file path
+        self.current_file = old_file;
+        result
     }
 }

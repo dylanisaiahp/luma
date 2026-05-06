@@ -7,14 +7,16 @@ pub struct Parser {
     pub tokens: Vec<Token>,
     pub position: usize,
     pub errors: Vec<ParseError>,
+    pub current_file: String,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn new(tokens: Vec<Token>, file: &str) -> Self {
         Parser {
             tokens,
             position: 0,
             errors: Vec::new(),
+            current_file: file.to_string(),
         }
     }
 

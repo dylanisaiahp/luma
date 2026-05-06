@@ -41,7 +41,7 @@ pub fn compile(stmts: Vec<Stmt>, options: CompileOptions) -> anyhow::Result<()> 
         Some(file) => Codegen::new().with_file(file),
         None => Codegen::new(),
     };
-    let generated = codegen.generate(&stmts);
+    let generated = codegen.generate(&stmts, options.source_file.as_deref().unwrap_or(""));
     let source_path = build_dir.join(format!("{}.rs", options.output_name));
     fs::write(&source_path, &generated)?;
 

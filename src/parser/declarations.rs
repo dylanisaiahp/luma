@@ -494,6 +494,7 @@ impl Parser {
         if let Some(TokenKind::Empty) = self.current_token().map(|t| &t.kind) {
             self.advance();
             return Ok(Expr {
+                file_path: self.current_file.clone(),
                 kind: ExprKind::Empty,
                 line,
                 column: col,
@@ -526,6 +527,7 @@ impl Parser {
         self.expect_token(TokenKind::RParen)?;
 
         Ok(Expr {
+            file_path: self.current_file.clone(),
             kind: ExprKind::Table(pairs),
             line,
             column: col,

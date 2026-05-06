@@ -16,6 +16,7 @@ impl Parser {
                         self.advance();
                         let operand = self.parse_primary_expression()?;
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Not(Box::new(operand)),
                             line,
                             column: col,
@@ -26,18 +27,22 @@ impl Parser {
                         let operand = self.parse_primary_expression()?;
                         match operand.kind {
                             ExprKind::Integer(n) => Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::Integer(-n),
                                 line,
                                 column: col,
                             }),
                             ExprKind::Float(f) => Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::Float(-f),
                                 line,
                                 column: col,
                             }),
                             _ => Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::BinaryOp {
                                     left: Box::new(Expr {
+                                        file_path: self.current_file.clone(),
                                         kind: ExprKind::Integer(0),
                                         line,
                                         column: col,
@@ -61,6 +66,7 @@ impl Parser {
                         {
                             self.advance();
                             return Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::List(Vec::new()),
                                 line,
                                 column: col,
@@ -87,6 +93,7 @@ impl Parser {
                             }
                             self.expect_token(TokenKind::RParen)?;
                             return Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::List(items),
                                 line,
                                 column: col,
@@ -103,6 +110,7 @@ impl Parser {
                     TokenKind::CharLiteral(s) => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Char(s),
                             line,
                             column: col,
@@ -111,6 +119,7 @@ impl Parser {
                     TokenKind::Number(n) => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Integer(n),
                             line,
                             column: col,
@@ -119,6 +128,7 @@ impl Parser {
                     TokenKind::FloatLiteral(f) => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Float(f),
                             line,
                             column: col,
@@ -127,6 +137,7 @@ impl Parser {
                     TokenKind::True => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Boolean(true),
                             line,
                             column: col,
@@ -135,6 +146,7 @@ impl Parser {
                     TokenKind::False => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Boolean(false),
                             line,
                             column: col,
@@ -143,6 +155,7 @@ impl Parser {
                     TokenKind::Empty => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Empty,
                             line,
                             column: col,
@@ -154,6 +167,7 @@ impl Parser {
                         let inner = self.parse_expression()?;
                         self.expect_token(TokenKind::RParen)?;
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Some(Box::new(inner)),
                             line,
                             column: col,
@@ -162,6 +176,7 @@ impl Parser {
                     TokenKind::None => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::None,
                             line,
                             column: col,
@@ -214,6 +229,7 @@ impl Parser {
                             };
                             self.advance(); // consume 'max'/'min'
                             return Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::TypeConstant {
                                     type_name: name,
                                     constant: ident,
@@ -239,6 +255,7 @@ impl Parser {
                             }
                             self.expect_token(TokenKind::RParen)?;
                             return Ok(Expr {
+                                file_path: self.current_file.clone(),
                                 kind: ExprKind::Call { name, args },
                                 line,
                                 column: col,
@@ -246,6 +263,7 @@ impl Parser {
                         }
 
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Identifier(name),
                             line,
                             column: col,
@@ -254,6 +272,7 @@ impl Parser {
                     TokenKind::Identifier(name) => {
                         self.advance();
                         Ok(Expr {
+                            file_path: self.current_file.clone(),
                             kind: ExprKind::Identifier(name),
                             line,
                             column: col,
@@ -287,6 +306,7 @@ impl Parser {
                 TokenKind::StringLiteral(s) => {
                     self.advance();
                     parts.push(Expr {
+                        file_path: self.current_file.clone(),
                         kind: ExprKind::String(s),
                         line: token.line,
                         column: token.column,
@@ -295,6 +315,7 @@ impl Parser {
                 TokenKind::Interpolation(ident) => {
                     self.advance();
                     parts.push(Expr {
+                        file_path: self.current_file.clone(),
                         kind: ExprKind::Interpolation(ident),
                         line: token.line,
                         column: token.column,
@@ -306,6 +327,7 @@ impl Parser {
 
         if parts.is_empty() {
             return Ok(Expr {
+                file_path: self.current_file.clone(),
                 kind: ExprKind::String(String::new()),
                 line: start_line,
                 column: start_col,
@@ -319,6 +341,7 @@ impl Parser {
         let mut result = parts.remove(0);
         for part in parts {
             result = Expr {
+                file_path: self.current_file.clone(),
                 kind: ExprKind::BinaryOp {
                     left: Box::new(result),
                     op: crate::syntax::BinaryOp::Add,
