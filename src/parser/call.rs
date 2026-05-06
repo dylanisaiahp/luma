@@ -19,17 +19,17 @@ impl Parser {
                         && matches!(self.tokens.get(self.position + 2), Some(t) if t.kind == TokenKind::Colon);
 
                     if is_struct_instantiate {
-                    let struct_name = match &expr.kind {
-                        ExprKind::Identifier(n) => n.clone(),
-                        _ => {
-                            return Err(ParseError::UnexpectedToken {
-                                expected: "identifier".to_string(),
-                                got: TokenKind::Eof,
-                                line_num: token.line,
-                                col_num: token.column,
-                            })
-                        }
-                    };
+                        let struct_name = match &expr.kind {
+                            ExprKind::Identifier(n) => n.clone(),
+                            _ => {
+                                return Err(ParseError::UnexpectedToken {
+                                    expected: "identifier".to_string(),
+                                    got: TokenKind::Eof,
+                                    line_num: token.line,
+                                    col_num: token.column,
+                                });
+                            }
+                        };
                         self.advance(); // consume '('
                         let mut fields = Vec::new();
 
@@ -209,7 +209,7 @@ impl Parser {
                                         got: TokenKind::Eof,
                                         line_num: dot_token.line,
                                         col_num: dot_token.column,
-                                    })
+                                    });
                                 }
                             };
                             expr = Expr {
@@ -250,7 +250,7 @@ impl Parser {
                                         got: TokenKind::Eof,
                                         line_num: dot_token.line,
                                         col_num: dot_token.column,
-                                    })
+                                    });
                                 }
                             };
                             expr = Expr {

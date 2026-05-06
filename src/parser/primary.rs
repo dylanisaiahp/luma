@@ -188,7 +188,7 @@ impl Parser {
                                     got: self.current_or_eof().kind,
                                     line_num: line,
                                     col_num: col,
-                                })
+                                });
                             }
                         };
                         self.advance();
@@ -209,7 +209,7 @@ impl Parser {
                                         got: self.current_or_eof().kind,
                                         line_num: line,
                                         col_num: col,
-                                    })
+                                    });
                                 }
                             };
                             self.advance(); // consume 'max'/'min'
