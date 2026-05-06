@@ -741,13 +741,13 @@ impl Codegen {
                     self.emit_expr(right)
                 ),
                 BinaryOp::And => format!(
-                    "{{ if let (Value::Boolean(l), Value::Boolean(r)) = {}, {} {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }} }}",
+                    "if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l && r) }} else {{ luma_runtime::runtime_error_with_location(\"'and' requires booleans\", \"{}\", 0, 0) }}",
                     self.emit_expr(left),
                     self.emit_expr(right),
                     self.current_file
                 ),
                 BinaryOp::Or => format!(
-                    "{{ if let (Value::Boolean(l), Value::Boolean(r)) = {}, {} {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }} }}",
+                    "if let (Value::Boolean(l), Value::Boolean(r)) = ({}, {}) {{ Value::Boolean(l || r) }} else {{ luma_runtime::runtime_error_with_location(\"'or' requires booleans\", \"{}\", 0, 0) }}",
                     self.emit_expr(left),
                     self.emit_expr(right),
                     self.current_file
