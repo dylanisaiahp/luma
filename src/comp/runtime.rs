@@ -815,7 +815,10 @@ fn string_method(
                 match arg {
                     Value::String(a) => result.push_str(a),
                     Value::Char(c) => result.push(*c),
-                    _ => unreachable!(), // Already checked above
+                    other => return runtime_error_with_location(
+                        &format!("string.concat() expected string or char, found {:?}", other),
+                        file, line, col
+                    ),
                 }
             }
 

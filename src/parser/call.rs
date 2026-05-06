@@ -19,10 +19,17 @@ impl Parser {
                         && matches!(self.tokens.get(self.position + 2), Some(t) if t.kind == TokenKind::Colon);
 
                     if is_struct_instantiate {
-                        let struct_name = match &expr.kind {
-                            ExprKind::Identifier(n) => n.clone(),
-                            _ => panic!("struct instantiation requires identifier"),
-                        };
+                    let struct_name = match &expr.kind {
+                        ExprKind::Identifier(n) => n.clone(),
+                        _ => {
+                            return Err(ParseError::UnexpectedToken {
+                                expected: "identifier".to_string(),
+                                got: TokenKind::Eof,
+                                line_num: token.line,
+                                col_num: token.column,
+                            })
+                        }
+                    };
                         self.advance(); // consume '('
                         let mut fields = Vec::new();
 
@@ -196,7 +203,14 @@ impl Parser {
                         if is_enum_variant {
                             let enum_name = match &expr.kind {
                                 ExprKind::Identifier(n) => n.clone(),
-                                _ => panic!("enum variant with data requires identifier"),
+                                _ => {
+                                    return Err(ParseError::UnexpectedToken {
+                                        expected: "identifier".to_string(),
+                                        got: TokenKind::Eof,
+                                        line_num: dot_token.line,
+                                        col_num: dot_token.column,
+                                    })
+                                }
                             };
                             expr = Expr {
                                 kind: ExprKind::EnumVariantData {
@@ -230,7 +244,14 @@ impl Parser {
                         if is_enum_variant {
                             let enum_name = match &expr.kind {
                                 ExprKind::Identifier(n) => n.clone(),
-                                _ => panic!("enum variant requires identifier"),
+                                _ => {
+                                    return Err(ParseError::UnexpectedToken {
+                                        expected: "identifier".to_string(),
+                                        got: TokenKind::Eof,
+                                        line_num: dot_token.line,
+                                        col_num: dot_token.column,
+                                    })
+                                }
                             };
                             expr = Expr {
                                 kind: ExprKind::EnumVariant {

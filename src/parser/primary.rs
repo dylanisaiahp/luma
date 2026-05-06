@@ -182,7 +182,14 @@ impl Parser {
                             TokenKind::Char => "char".to_string(),
                             TokenKind::Env => "env".to_string(),
                             TokenKind::Home => "home".to_string(),
-                            _ => panic!("type keyword expected"),
+                            _ => {
+                                return Err(ParseError::UnexpectedToken {
+                                    expected: "type keyword".to_string(),
+                                    got: self.current_or_eof().kind,
+                                    line_num: line,
+                                    col_num: col,
+                                })
+                            }
                         };
                         self.advance();
 
@@ -196,7 +203,14 @@ impl Parser {
                             self.advance(); // consume '.'
                             let ident = match &self.tokens[self.position].kind {
                                 TokenKind::Identifier(s) => s.clone(),
-                                _ => panic!("type constant identifier expected"),
+                                _ => {
+                                    return Err(ParseError::UnexpectedToken {
+                                        expected: "type constant identifier".to_string(),
+                                        got: self.current_or_eof().kind,
+                                        line_num: line,
+                                        col_num: col,
+                                    })
+                                }
                             };
                             self.advance(); // consume 'max'/'min'
                             return Ok(Expr {

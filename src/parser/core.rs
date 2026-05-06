@@ -464,7 +464,15 @@ impl Parser {
                 TokenKind::Identifier(_) if self.is_typed_function() => {
                     let return_type = match &token.kind {
                         TokenKind::Identifier(name) => name.clone(),
-                        _ => panic!("typed function requires identifier for return type"),
+                        _ => {
+                            self.errors.push(ParseError::UnexpectedToken {
+                                expected: "identifier for return type".to_string(),
+                                got: self.current_or_eof().kind,
+                                line_num: token.line,
+                                col_num: token.column,
+                            });
+                            continue;
+                        }
                     };
                     self.advance();
                     if let Some(func) = self.parse_function(return_type) {
